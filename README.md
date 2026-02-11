@@ -1,73 +1,104 @@
-# Welcome to your Lovable project
+🚀 EduTrack
 
-## Project info
+Student Project Progress & Performance Tracking System with GitHub Integration
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+EduTrack is a web-based project tracking and performance monitoring platform designed for academic institutions and training programs.
+It provides structured project management, mentor feedback, and real-time progress insights, with optional GitHub integration to reflect actual development activity.
 
-## How can I edit this code?
+⸻
 
-There are several ways of editing your application.
+🧩 Problem Statement
 
-**Use Lovable**
+Students and early-career developers often work on long-term team projects where:
+	•	Project planning, tracking, and feedback are scattered across tools
+	•	GitHub shows code activity but lacks academic progress context
+	•	Mentors struggle to evaluate individual contributions fairly
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+This fragmentation results in:
+	•	Poor visibility into real project progress
+	•	Delayed issue identification
+	•	Ineffective performance evaluation
 
-Changes made via Lovable will be committed automatically to this repo.
+EduTrack solves this by combining project management with GitHub-based activity insights in a single platform.
 
-**Use your preferred IDE**
+⸻
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+🎯 Objectives
+	•	Provide a centralized project tracking system
+	•	Enable role-based access for Students, Mentors, and Admins
+	•	Track tasks, milestones, and deadlines
+	•	Collect mentor feedback and review history
+	•	Integrate GitHub data to reflect real development activity
+	•	Offer scalable and secure architecture
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+⸻
 
-Follow these steps:
+🏗️ Project Architecture
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+This project follows a clean, modular architecture:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Frontend
+	•	Built using React + TypeScript
+	•	Styled with Tailwind CSS
+	•	Bundled using Vite
+	•	Provides dashboards, task views, and role-based UI
 
-# Step 3: Install the necessary dependencies.
-npm i
+Backend & Database
+	•	Supabase used as Backend-as-a-Service
+	•	PostgreSQL database
+	•	Authentication & RBAC
+	•	Row Level Security (RLS)
+	•	Supabase Edge Functions
+	•	GitHub API integration
+	•	Commit and contributor analytics
+	•	SQL schema defined explicitly for transparency
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+🔑 Core Features (Implemented / Planned)
 
-**Edit a file directly in GitHub**
+✅ Core Features
+	•	User authentication (Student / Mentor / Admin)
+	•	Project creation with description and timeline
+	•	Team member onboarding
+	•	Task & milestone management
+	•	Real-time progress tracking
+	•	Mentor feedback & comments
+	•	Centralized project dashboard
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+🔗 GitHub Integration (Optional / Extended)
+	•	Secure repository linking using GitHub API
+	•	Automatic sync of:
+	•	Commits
+	•	Contributors
+	•	Branches
+	•	Pull requests
+	•	Visualization of contribution activity
+	•	Mapping GitHub activity to tasks and milestones
 
-**Use GitHub Codespaces**
+🌟 Advanced Features (Bonus Scope)
+	•	Performance scoring based on:
+	•	Task completion
+	•	Deadlines
+	•	Contribution frequency
+	•	Role-based access control (RBAC)
+	•	Sprint & Agile workflow support
+	•	Early risk detection insights
+	•	Audit logs & activity tracking
+	•	Email / in-app notifications
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+⸻
 
-## What technologies are used for this project?
+🧪 Tech Stack
 
-This project is built with:
+Frontend
+	•	React
+	•	TypeScript
+	•	Tailwind CSS
+	•	Vite
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Backend & Database
+	•	Supabase (PostgreSQL)
+	•	Supabase Auth
+	•	Supabase Edge Functions
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+APIs
+	•	GitHub REST API
