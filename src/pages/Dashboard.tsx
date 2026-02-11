@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import MentorDashboard from "@/pages/dashboards/MentorDashboard";
+import AdminDashboard from "@/pages/dashboards/AdminDashboard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProjectCard } from "@/components/ui/project-card";
@@ -134,13 +136,17 @@ const upcomingDeadlines = [
 ];
 
 export default function Dashboard() {
-  const [userRole] = useState<"student" | "mentor" | "admin">("student");
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
+  const userRole = profile?.role || "student";
   const userFirstName = profile?.name?.split(" ")[0] || "there";
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const { toast } = useToast();
+
+  // Route to role-specific dashboard
+  if (!loading && userRole === "mentor") return <MentorDashboard />;
+  if (!loading && userRole === "admin") return <AdminDashboard />;
 
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +168,7 @@ export default function Dashboard() {
   };
 
   return (
-    <DashboardLayout userRole={userRole}>
+    <DashboardLayout userRole="student">
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -174,85 +180,6 @@ export default function Dashboard() {
               Here's what's happening with your projects today.
             </p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button variant="gradient" className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-                <DialogDescription>
-                  Start a new project by filling in the details below.
-                </DialogDescription>
-              </DialogHeader>
-              <form className="space-y-4 mt-4" onSubmit={handleCreateProject}>
-                <div className="space-y-2">
-                  <Label htmlFor="dashboard-project-name">Project Name</Label>
-                  <Input
-                    id="dashboard-project-name"
-                    placeholder="Enter project name"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dashboard-description">Description</Label>
-                  <Textarea
-                    id="dashboard-description"
-                    placeholder="Describe your project objectives..."
-                    rows={3}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dashboard-due-date">Due Date</Label>
-                    <Input id="dashboard-due-date" type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dashboard-status">Status</Label>
-                    <Select defaultValue="active">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="on_hold">On Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dashboard-github">GitHub Repository (Optional)</Label>
-                  <div className="relative">
-                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="dashboard-github"
-                      placeholder="https://github.com/username/repo"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setIsCreateOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="gradient" className="flex-1">
-                    Create Project
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Stats Grid */}
@@ -363,8 +290,8 @@ export default function Dashboard() {
                 >
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-lg ${deadline.type === "milestone"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-warning/10 text-warning"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-warning/10 text-warning"
                       }`}
                   >
                     {deadline.type === "milestone" ? (

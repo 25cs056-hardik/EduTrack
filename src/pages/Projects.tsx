@@ -1,116 +1,24 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useProjects } from "@/contexts/ProjectsContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProjectCard } from "@/components/ui/project-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Plus, Search, Filter, LayoutGrid, List, GitBranch } from "lucide-react";
+import { Plus, Search, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-
-const allProjects = [
-  {
-    id: "1",
-    title: "E-Commerce Platform Development",
-    description: "Building a full-stack e-commerce solution with React and Node.js",
-    progress: 75,
-    status: "active" as const,
-    dueDate: "Mar 15, 2024",
-    members: [
-      { name: "Alice Johnson" },
-      { name: "Bob Smith" },
-      { name: "Carol White" },
-    ],
-    tasksCompleted: 18,
-    totalTasks: 24,
-    githubConnected: true,
-  },
-  {
-    id: "2",
-    title: "Machine Learning Research Paper",
-    description: "Research on deep learning applications in healthcare",
-    progress: 45,
-    status: "active" as const,
-    dueDate: "Apr 20, 2024",
-    members: [{ name: "David Lee" }, { name: "Eva Green" }],
-    tasksCompleted: 9,
-    totalTasks: 20,
-    githubConnected: false,
-  },
-  {
-    id: "3",
-    title: "Mobile App for Campus Events",
-    description: "React Native app for managing and discovering campus events",
-    progress: 100,
-    status: "completed" as const,
-    dueDate: "Jan 10, 2024",
-    members: [{ name: "Frank Miller" }, { name: "Grace Lee" }, { name: "Henry Wilson" }],
-    tasksCompleted: 32,
-    totalTasks: 32,
-    githubConnected: true,
-  },
-  {
-    id: "4",
-    title: "AI Chatbot for Student Support",
-    description: "Implementing an AI-powered chatbot to assist students with queries",
-    progress: 20,
-    status: "on_hold" as const,
-    dueDate: "May 30, 2024",
-    members: [{ name: "Ivy Chen" }],
-    tasksCompleted: 4,
-    totalTasks: 20,
-    githubConnected: true,
-  },
-];
 
 type StatusFilter = "all" | "active" | "completed" | "on_hold";
 
 export default function Projects() {
+  const navigate = useNavigate();
+  const { projects } = useProjects();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [description, setDescription] = useState("");
-  const { toast } = useToast();
 
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a project name.",
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({
-      title: "Project Created",
-      description: `"${projectName}" has been created successfully.`,
-    });
-    setProjectName("");
-    setDescription("");
-    setIsCreateOpen(false);
-  };
-
-  const filteredProjects = allProjects.filter((project) => {
+  const filteredProjects = projects.filter((project) => {
     const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
@@ -118,10 +26,10 @@ export default function Projects() {
   });
 
   const statusCounts = {
-    all: allProjects.length,
-    active: allProjects.filter((p) => p.status === "active").length,
-    completed: allProjects.filter((p) => p.status === "completed").length,
-    on_hold: allProjects.filter((p) => p.status === "on_hold").length,
+    all: projects.length,
+    active: projects.filter((p) => p.status === "active").length,
+    completed: projects.filter((p) => p.status === "completed").length,
+    on_hold: projects.filter((p) => p.status === "on_hold").length,
   };
 
   return (
@@ -135,85 +43,10 @@ export default function Projects() {
               Manage and track all your academic projects
             </p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button variant="gradient" className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
-                <DialogDescription>
-                  Start a new project by filling in the details below.
-                </DialogDescription>
-              </DialogHeader>
-              <form className="space-y-4 mt-4" onSubmit={handleCreateProject}>
-                <div className="space-y-2">
-                  <Label htmlFor="project-name">Project Name</Label>
-                  <Input 
-                    id="project-name" 
-                    placeholder="Enter project name" 
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your project objectives..."
-                    rows={3}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="due-date">Due Date</Label>
-                    <Input id="due-date" type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select defaultValue="active">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="on_hold">On Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="github">GitHub Repository (Optional)</Label>
-                  <div className="relative">
-                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="github"
-                      placeholder="https://github.com/username/repo"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setIsCreateOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="gradient" className="flex-1">
-                    Create Project
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button variant="gradient" className="gap-2" onClick={() => navigate("/projects/new")}>
+            <Plus className="h-4 w-4" />
+            New Project
+          </Button>
         </div>
 
         {/* Filters & Search */}
@@ -279,7 +112,10 @@ export default function Projects() {
                 className="animate-fade-in"
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
-                <ProjectCard {...project} />
+                <ProjectCard
+                  {...project}
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                />
               </div>
             ))}
           </div>

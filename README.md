@@ -101,5 +101,4 @@ Backend & Database
 	•	Supabase Edge Functions
 
 APIs
-<<<<<<< HEAD
->>>>>>> 8650942 (fixed error of profile edit)
+	•	GitHub REST API

@@ -28,10 +28,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: FolderKanban, label: "Projects", href: "/projects" },
-  { icon: ListTodo, label: "Tasks", href: "/tasks" },
-  { icon: GitBranch, label: "GitHub Analytics", href: "/github" },
-  { icon: MessageSquare, label: "Feedback", href: "/feedback", roles: ["mentor", "admin"] },
+  { icon: FolderKanban, label: "Projects", href: "/projects", roles: ["student"] },
+  { icon: ListTodo, label: "Tasks", href: "/tasks", roles: ["student"] },
+  { icon: GitBranch, label: "GitHub Analytics", href: "/github", roles: ["student"] },
+  { icon: MessageSquare, label: "Feedback", href: "/feedback", roles: ["student", "mentor"] },
   { icon: Users, label: "Team", href: "/team" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
@@ -46,11 +46,12 @@ export function AppSidebar({ userRole = "student" }: AppSidebarProps) {
   const navigate = useNavigate();
   const { profile } = useAuth();
 
+  const effectiveRole = profile?.role || userRole;
   const userName = profile?.name || "User";
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   const filteredItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
+    (item) => !item.roles || item.roles.includes(effectiveRole)
   );
 
   const handleSignOut = async () => {
@@ -136,7 +137,7 @@ export function AppSidebar({ userRole = "student" }: AppSidebarProps) {
             {!collapsed && (
               <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-medium text-foreground truncate">{userName}</p>
-                <p className="text-xs text-muted-foreground capitalize">{profile?.role || userRole}</p>
+                <p className="text-xs text-muted-foreground capitalize">{effectiveRole}</p>
               </div>
             )}
             {!collapsed && (

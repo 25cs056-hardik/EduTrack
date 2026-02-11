@@ -4,15 +4,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProjectsProvider } from "@/contexts/ProjectsContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
+import AddProject from "./pages/AddProject";
+import ProjectDetails from "./pages/ProjectDetails";
 import Tasks from "./pages/Tasks";
 import GitHubAnalytics from "./pages/GitHubAnalytics";
 import Feedback from "./pages/Feedback";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
+import AccessDenied from "./pages/AccessDenied";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,24 +25,75 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/github" element={<GitHubAnalytics />} />
-            <Route path="/feedback" element={<Feedback />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ProjectsProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/access-denied" element={<AccessDenied />} />
+
+              {/* All authenticated roles */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/team" element={
+                <ProtectedRoute>
+                  <Team />
+                </ProtectedRoute>
+              } />
+
+              {/* Student only */}
+              <Route path="/projects" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <Projects />
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/new" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <AddProject />
+                </ProtectedRoute>
+              } />
+              <Route path="/tasks" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <Tasks />
+                </ProtectedRoute>
+              } />
+              <Route path="/github" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <GitHubAnalytics />
+                </ProtectedRoute>
+              } />
+
+              {/* Project details — all roles can view */}
+              <Route path="/projects/:id" element={
+                <ProtectedRoute>
+                  <ProjectDetails />
+                </ProtectedRoute>
+              } />
+
+              {/* Student + Mentor */}
+              <Route path="/feedback" element={
+                <ProtectedRoute allowedRoles={["student", "mentor"]}>
+                  <Feedback />
+                </ProtectedRoute>
+              } />
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ProjectsProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

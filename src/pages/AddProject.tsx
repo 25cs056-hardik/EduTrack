@@ -1,0 +1,244 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useProjects } from "@/contexts/ProjectsContext";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, GitBranch, Rocket, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+export default function AddProject() {
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const { addProject } = useProjects();
+
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const [techInput, setTechInput] = useState("");
+    const [technologies, setTechnologies] = useState<string[]>([]);
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [status, setStatus] = useState<"active" | "on_hold">("active");
+    const [githubUrl, setGithubUrl] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    const addTech = () => {
+        const tech = techInput.trim();
+        if (tech && !technologies.includes(tech)) {
+            setTechnologies([...technologies, tech]);
+            setTechInput("");
+        }
+    };
+
+    const removeTech = (t: string) => {
+        setTechnologies(technologies.filter((x) => x !== t));
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            addTech();
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!title.trim()) {
+            toast({ title: "Error", description: "Project title is required.", variant: "destructive" });
+            return;
+        }
+        if (!startDate) {
+            toast({ title: "Error", description: "Start date is required.", variant: "destructive" });
+            return;
+        }
+
+        setSubmitting(true);
+
+        // Add project to shared state
+        addProject({
+            title: title.trim(),
+            description: description.trim(),
+            technologies,
+            startDate,
+            dueDate: endDate || "TBD",
+            status,
+            githubUrl: githubUrl.trim(),
+        });
+
+        toast({
+            title: "Project Created",
+            description: `"${title}" has been created successfully.`,
+        });
+        setSubmitting(false);
+        navigate("/projects");
+    };
+
+    return (
+        <DashboardLayout userRole="student">
+            <div className="w-full max-w-4xl mx-auto space-y-6">
+                {/* Back button */}
+                <Button variant="ghost" className="gap-2 -ml-2" onClick={() => navigate("/projects")}>
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Projects
+                </Button>
+
+                {/* Form Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-2xl">
+                            <Rocket className="h-6 w-6 text-primary" />
+                            Create New Project
+                        </CardTitle>
+                        <CardDescription>
+                            Fill in the details below to set up your new project.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="space-y-6" onSubmit={handleSubmit}>
+                            {/* Title */}
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Project Title *</Label>
+                                <Input
+                                    id="title"
+                                    placeholder="Enter project title"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Description */}
+                            <div className="space-y-2">
+                                <Label htmlFor="desc">Description</Label>
+                                <Textarea
+                                    id="desc"
+                                    placeholder="Describe your project objectives, scope, and goals..."
+                                    rows={4}
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Technologies */}
+                            <div className="space-y-2">
+                                <Label>Technologies Used</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="e.g. React, Node.js, PostgreSQL"
+                                        value={techInput}
+                                        onChange={(e) => setTechInput(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                    />
+                                    <Button type="button" variant="outline" onClick={addTech}>
+                                        Add
+                                    </Button>
+                                </div>
+                                {technologies.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {technologies.map((tech) => (
+                                            <Badge key={tech} variant="secondary" className="gap-1 pr-1">
+                                                {tech}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeTech(tech)}
+                                                    className="ml-1 rounded-full hover:bg-destructive/20 p-0.5"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dates row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="start-date">Start Date *</Label>
+                                    <Input
+                                        id="start-date"
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="end-date">End Date</Label>
+                                    <Input
+                                        id="end-date"
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            <div className="space-y-2">
+                                <Label>Project Status</Label>
+                                <Select value={status} onValueChange={(v) => setStatus(v as "active" | "on_hold")}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="on_hold">On Hold</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* GitHub URL */}
+                            <div className="space-y-2">
+                                <Label htmlFor="github-url">GitHub Repository URL</Label>
+                                <div className="relative">
+                                    <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="github-url"
+                                        placeholder="https://github.com/username/repo"
+                                        className="pl-10"
+                                        value={githubUrl}
+                                        onChange={(e) => setGithubUrl(e.target.value)}
+                                    />
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Link a GitHub repository to track commits, contributors, and activity.
+                                </p>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-3 pt-4 border-t border-border">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => navigate("/projects")}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    variant="gradient"
+                                    className="flex-1"
+                                    disabled={submitting}
+                                >
+                                    {submitting ? "Creating..." : "Create Project"}
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </DashboardLayout>
+    );
+}
