@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   User,
   Bell,
@@ -17,12 +20,63 @@ import {
 
 export default function Settings() {
   const { toast } = useToast();
+  const { profile, user, refreshProfile } = useAuth();
+  const [saving, setSaving] = useState(false);
 
-  const handleSaveProfile = () => {
-    toast({
-      title: "Profile Updated",
-      description: "Your profile changes have been saved successfully.",
-    });
+  // Form state initialized from profile
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+
+  // Populate form when profile loads
+  useEffect(() => {
+    if (profile) {
+      const nameParts = (profile.name || "").split(" ");
+      setFirstName(nameParts[0] || "");
+      setLastName(nameParts.slice(1).join(" ") || "");
+      setEmail(profile.email || "");
+    }
+  }, [profile]);
+
+  const userInitials = profile
+    ? profile.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+    try {
+      // Update auth user metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { name: fullName },
+      });
+      if (authError) throw authError;
+
+      // Also update public.users table if it exists
+      if (user?.id) {
+        await (supabase as any)
+          .from("users")
+          .update({ name: fullName })
+          .eq("id", user.id);
+      }
+
+      await refreshProfile();
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile changes have been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save profile changes.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveNotifications = () => {
@@ -70,7 +124,7 @@ export default function Settings() {
                     <Avatar className="h-20 w-20">
                       <AvatarImage src="" />
                       <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
-                        JD
+                        {userInitials}
                       </AvatarFallback>
                     </Avatar>
                     <Button
@@ -93,36 +147,45 @@ export default function Settings() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" defaultValue="John" />
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" defaultValue="Doe" />
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" defaultValue="john.doe@university.edu" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="studentId">Student ID</Label>
-                    <Input id="studentId" defaultValue="STU-2024-001" />
+                    <Input id="email" type="email" value={email} disabled />
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="bio">Bio</Label>
-                    <Input id="bio" placeholder="Tell us about yourself..." />
+                    <Input
+                      id="bio"
+                      placeholder="Tell us about yourself..."
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                    />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">Student</Badge>
+                  <Badge variant="outline" className="capitalize">{profile?.role || "Student"}</Badge>
                   <span className="text-sm text-muted-foreground">
                     Role assigned by administrator
                   </span>
                 </div>
 
-                <Button variant="gradient" className="gap-2" onClick={handleSaveProfile}>
+                <Button variant="gradient" className="gap-2" onClick={handleSaveProfile} disabled={saving}>
                   <Save className="h-4 w-4" />
-                  Save Changes
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </CardContent>
             </Card>

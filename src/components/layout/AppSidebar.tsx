@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavItem {
   icon: React.ElementType;
@@ -43,6 +44,10 @@ export function AppSidebar({ userRole = "student" }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+
+  const userName = profile?.name || "User";
+  const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   const filteredItems = navItems.filter(
     (item) => !item.roles || item.roles.includes(userRole)
@@ -126,12 +131,12 @@ export function AppSidebar({ userRole = "student" }: AppSidebarProps) {
             )}
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-              JD
+              {userInitials}
             </div>
             {!collapsed && (
               <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium text-foreground truncate">John Doe</p>
-                <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+                <p className="text-sm font-medium text-foreground truncate">{userName}</p>
+                <p className="text-xs text-muted-foreground capitalize">{profile?.role || userRole}</p>
               </div>
             )}
             {!collapsed && (

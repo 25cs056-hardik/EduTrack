@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProjectCard } from "@/components/ui/project-card";
@@ -134,6 +135,8 @@ const upcomingDeadlines = [
 
 export default function Dashboard() {
   const [userRole] = useState<"student" | "mentor" | "admin">("student");
+  const { profile } = useAuth();
+  const userFirstName = profile?.name?.split(" ")[0] || "there";
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
@@ -165,7 +168,7 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              Welcome back, John! 👋
+              Welcome back, {userFirstName}! 👋
             </h1>
             <p className="text-muted-foreground mt-1">
               Here's what's happening with your projects today.
@@ -188,9 +191,9 @@ export default function Dashboard() {
               <form className="space-y-4 mt-4" onSubmit={handleCreateProject}>
                 <div className="space-y-2">
                   <Label htmlFor="dashboard-project-name">Project Name</Label>
-                  <Input 
-                    id="dashboard-project-name" 
-                    placeholder="Enter project name" 
+                  <Input
+                    id="dashboard-project-name"
+                    placeholder="Enter project name"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                   />
@@ -359,11 +362,10 @@ export default function Dashboard() {
                   className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 transition-colors hover:bg-secondary"
                 >
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                      deadline.type === "milestone"
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${deadline.type === "milestone"
                         ? "bg-primary/10 text-primary"
                         : "bg-warning/10 text-warning"
-                    }`}
+                      }`}
                   >
                     {deadline.type === "milestone" ? (
                       <CheckCircle2 className="h-5 w-5" />
