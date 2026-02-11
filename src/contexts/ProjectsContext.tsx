@@ -1,4 +1,22 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+export interface GitHubData {
+    repoName: string;
+    fullName: string;
+    description: string;
+    stars: number;
+    forks: number;
+    openIssues: number;
+    defaultBranch: string;
+    language: string;
+    lastUpdated: string;
+    totalCommits: number;
+    totalContributors: number;
+    totalBranches: number;
+    lastCommitDate: string;
+}
 
 export interface Project {
     id: string;
@@ -14,9 +32,10 @@ export interface Project {
     tasksCompleted: number;
     totalTasks: number;
     githubConnected: boolean;
+    githubData?: GitHubData | null;
 }
 
-// Seed projects
+// Seed projects used as fallback when Supabase table is unavailable
 const seedProjects: Project[] = [
     {
         id: "1",
@@ -37,6 +56,7 @@ const seedProjects: Project[] = [
         tasksCompleted: 18,
         totalTasks: 24,
         githubConnected: true,
+        githubData: null,
     },
     {
         id: "2",
@@ -53,6 +73,7 @@ const seedProjects: Project[] = [
         tasksCompleted: 9,
         totalTasks: 20,
         githubConnected: false,
+        githubData: null,
     },
     {
         id: "3",
@@ -73,6 +94,7 @@ const seedProjects: Project[] = [
         tasksCompleted: 32,
         totalTasks: 32,
         githubConnected: true,
+        githubData: null,
     },
     {
         id: "4",
@@ -89,31 +111,146 @@ const seedProjects: Project[] = [
         tasksCompleted: 4,
         totalTasks: 20,
         githubConnected: true,
+        githubData: null,
     },
 ];
 
+interface AddProjectData {
+    title: string;
+    description: string;
+    technologies: string[];
+    startDate: string;
+    dueDate: string;
+    status: "active" | "completed" | "on_hold";
+    githubUrl: string;
+    githubData?: GitHubData | null;
+}
+
 interface ProjectsContextType {
     projects: Project[];
-    addProject: (project: Omit<Project, "id" | "progress" | "members" | "tasksCompleted" | "totalTasks" | "githubConnected">) => Project;
+    loading: boolean;
+    addProject: (data: AddProjectData) => Promise<Project>;
     getProject: (id: string) => Project | undefined;
+    refreshProjects: () => Promise<void>;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined);
 
-export function ProjectsProvider({ children }: { children: ReactNode }) {
-    const [projects, setProjects] = useState<Project[]>(seedProjects);
+// Convert a Supabase row to our Project interface
+function rowToProject(row: any): Project {
+    return {
+        id: row.id,
+        title: row.title || "",
+        description: row.description || "",
+        progress: row.progress || 0,
+        status: row.status || "active",
+        startDate: row.start_date || "",
+        dueDate: row.due_date || "",
+        technologies: row.technologies || [],
+        githubUrl: row.github_url || "",
+        members: [],
+        tasksCompleted: row.tasks_completed || 0,
+        totalTasks: row.total_tasks || 0,
+        githubConnected: !!(row.github_url),
+        githubData: row.github_data || null,
+    };
+}
 
-    const addProject = (
-        data: Omit<Project, "id" | "progress" | "members" | "tasksCompleted" | "totalTasks" | "githubConnected">
-    ): Project => {
+export function ProjectsProvider({ children }: { children: ReactNode }) {
+    const { user } = useAuth();
+    const [projects, setProjects] = useState<Project[]>(seedProjects);
+    const [loading, setLoading] = useState(true);
+    const [usingDB, setUsingDB] = useState(false);
+
+    const fetchProjects = async () => {
+        if (!user) {
+            setProjects(seedProjects);
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const { data, error } = await (supabase as any)
+                .from("projects")
+                .select("*")
+                .eq("user_id", user.id)
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                // Table doesn't exist or RLS issue — fall back to seed data
+                console.warn("Projects table not available, using seed data:", error.message);
+                setUsingDB(false);
+                setProjects(seedProjects);
+            } else {
+                setUsingDB(true);
+                const fetched = (data || []).map(rowToProject);
+                // If user has no projects yet, show seed data as examples
+                setProjects(fetched.length > 0 ? fetched : seedProjects);
+            }
+        } catch {
+            setUsingDB(false);
+            setProjects(seedProjects);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProjects();
+    }, [user]);
+
+    const addProject = async (input: AddProjectData): Promise<Project> => {
+        if (usingDB && user) {
+            // Insert into Supabase
+            const { data, error } = await (supabase as any)
+                .from("projects")
+                .insert({
+                    user_id: user.id,
+                    title: input.title,
+                    description: input.description,
+                    technologies: input.technologies,
+                    start_date: input.startDate,
+                    due_date: input.dueDate,
+                    status: input.status,
+                    github_url: input.githubUrl,
+                    github_data: input.githubData || null,
+                    progress: 0,
+                    tasks_completed: 0,
+                    total_tasks: 0,
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Failed to insert project:", error.message);
+                throw new Error("Failed to save project. Please try again.");
+            }
+
+            const newProject = rowToProject(data);
+            setProjects((prev) => {
+                // If currently showing seed data, replace it with just the new project
+                const wasSeed = prev === seedProjects;
+                return wasSeed ? [newProject] : [newProject, ...prev];
+            });
+            return newProject;
+        }
+
+        // Fallback: add to local state only
         const newProject: Project = {
-            ...data,
             id: String(Date.now()),
+            title: input.title,
+            description: input.description,
             progress: 0,
+            status: input.status,
+            startDate: input.startDate,
+            dueDate: input.dueDate,
+            technologies: input.technologies,
+            githubUrl: input.githubUrl,
             members: [],
             tasksCompleted: 0,
             totalTasks: 0,
-            githubConnected: !!data.githubUrl,
+            githubConnected: !!input.githubUrl,
+            githubData: input.githubData || null,
         };
         setProjects((prev) => [newProject, ...prev]);
         return newProject;
@@ -121,8 +258,13 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
     const getProject = (id: string) => projects.find((p) => p.id === id);
 
+    const refreshProjects = async () => {
+        setLoading(true);
+        await fetchProjects();
+    };
+
     return (
-        <ProjectsContext.Provider value={{ projects, addProject, getProject }}>
+        <ProjectsContext.Provider value={{ projects, loading, addProject, getProject, refreshProjects }}>
             {children}
         </ProjectsContext.Provider>
     );

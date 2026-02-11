@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useProjects } from "@/contexts/ProjectsContext";
+import { useProjects, GitHubData } from "@/contexts/ProjectsContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,67 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, GitBranch, Rocket, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+/** Extract owner/repo from a GitHub URL or owner/repo string */
+function parseGitHubUrl(input: string): { owner: string; repo: string } | null {
+    const trimmed = input.trim().replace(/\/$/, "").replace(/\.git$/, "");
+    if (trimmed.includes("github.com")) {
+        const parts = trimmed.split("github.com/")[1]?.split("/");
+        if (parts && parts.length >= 2 && parts[0] && parts[1]) {
+            return { owner: parts[0], repo: parts[1] };
+        }
+    } else if (trimmed.includes("/")) {
+        const parts = trimmed.split("/");
+        if (parts.length >= 2 && parts[0] && parts[1]) {
+            return { owner: parts[0], repo: parts[1] };
+        }
+    }
+    return null;
+}
+
+/** Fetch real GitHub repo data from the public API */
+async function fetchGitHubData(owner: string, repo: string): Promise<GitHubData> {
+    const headers: Record<string, string> = {
+        Accept: "application/vnd.github.v3+json",
+    };
+
+    const [repoRes, contributorsRes, commitsRes, branchesRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=10`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=30`, { headers }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`, { headers }),
+    ]);
+
+    if (!repoRes.ok) {
+        const err = await repoRes.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub API error: ${repoRes.status}`);
+    }
+
+    const repoData = await repoRes.json();
+    const contributorsData = contributorsRes.ok ? await contributorsRes.json() : [];
+    const commitsData = commitsRes.ok ? await commitsRes.json() : [];
+    const branchesData = branchesRes.ok ? await branchesRes.json() : [];
+
+    return {
+        repoName: repoData.name || repo,
+        fullName: repoData.full_name || `${owner}/${repo}`,
+        description: repoData.description || "",
+        stars: repoData.stargazers_count || 0,
+        forks: repoData.forks_count || 0,
+        openIssues: repoData.open_issues_count || 0,
+        defaultBranch: repoData.default_branch || "main",
+        language: repoData.language || "",
+        lastUpdated: repoData.updated_at
+            ? new Date(repoData.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "Unknown",
+        totalCommits: Array.isArray(commitsData) ? commitsData.length : 0,
+        totalContributors: Array.isArray(contributorsData) ? contributorsData.length : 0,
+        totalBranches: Array.isArray(branchesData) ? branchesData.length : 0,
+        lastCommitDate: commitsData?.[0]?.commit?.author?.date
+            ? new Date(commitsData[0].commit.author.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "Unknown",
+    };
+}
 
 export default function AddProject() {
     const navigate = useNavigate();
@@ -52,7 +113,7 @@ export default function AddProject() {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!title.trim()) {
@@ -66,23 +127,48 @@ export default function AddProject() {
 
         setSubmitting(true);
 
-        // Add project to shared state
-        addProject({
-            title: title.trim(),
-            description: description.trim(),
-            technologies,
-            startDate,
-            dueDate: endDate || "TBD",
-            status,
-            githubUrl: githubUrl.trim(),
-        });
+        try {
+            // Fetch real GitHub data if URL provided
+            let githubData: GitHubData | null = null;
 
-        toast({
-            title: "Project Created",
-            description: `"${title}" has been created successfully.`,
-        });
-        setSubmitting(false);
-        navigate("/projects");
+            if (githubUrl.trim()) {
+                const parsed = parseGitHubUrl(githubUrl);
+                if (!parsed) {
+                    toast({ title: "Invalid GitHub URL", description: "Please enter a valid GitHub repository URL (e.g. https://github.com/owner/repo).", variant: "destructive" });
+                    setSubmitting(false);
+                    return;
+                }
+
+                try {
+                    githubData = await fetchGitHubData(parsed.owner, parsed.repo);
+                    toast({ title: "GitHub Connected", description: `Repository "${githubData.fullName}" linked successfully.` });
+                } catch (err: any) {
+                    toast({ title: "GitHub Warning", description: `Could not fetch repo data: ${err.message}. Project will be created without GitHub stats.`, variant: "destructive" });
+                    // Continue without GitHub data
+                }
+            }
+
+            await addProject({
+                title: title.trim(),
+                description: description.trim(),
+                technologies,
+                startDate,
+                dueDate: endDate || "TBD",
+                status,
+                githubUrl: githubUrl.trim(),
+                githubData,
+            });
+
+            toast({
+                title: "Project Created",
+                description: `"${title}" has been created successfully.`,
+            });
+            navigate("/projects");
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message || "Failed to create project.", variant: "destructive" });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -212,7 +298,7 @@ export default function AddProject() {
                                     />
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Link a GitHub repository to track commits, contributors, and activity.
+                                    Link a GitHub repository to automatically fetch commits, contributors, and activity data.
                                 </p>
                             </div>
 
