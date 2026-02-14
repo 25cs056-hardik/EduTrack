@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -5,71 +7,79 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Users, UserPlus, Mail, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
-const teamMembers = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john.doe@university.edu",
-    role: "student",
-    avatar: "",
-    projects: 3,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Dr. Sarah Wilson",
-    email: "s.wilson@university.edu",
-    role: "mentor",
-    avatar: "",
-    projects: 8,
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "m.johnson@university.edu",
-    role: "student",
-    avatar: "",
-    projects: 2,
-    status: "active",
-  },
-  {
-    id: 4,
-    name: "Emily Chen",
-    email: "e.chen@university.edu",
-    role: "student",
-    avatar: "",
-    projects: 4,
-    status: "away",
-  },
-  {
-    id: 5,
-    name: "Prof. Robert Brown",
-    email: "r.brown@university.edu",
-    role: "admin",
-    avatar: "",
-    projects: 12,
-    status: "active",
-  },
-];
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  project_id: string | null;
+  created_at: string;
+}
 
 const getRoleBadgeVariant = (role: string) => {
   switch (role) {
     case "admin":
-      return "default";
+      return "default" as const;
     case "mentor":
-      return "secondary";
+      return "secondary" as const;
     default:
-      return "outline";
+      return "outline" as const;
   }
 };
 
-const getStatusColor = (status: string) => {
-  return status === "active" ? "bg-success" : "bg-warning";
-};
-
 export default function Team() {
+  const { user } = useAuth();
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!user) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from("team_members")
+          .select("*")
+          .eq("added_by", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Failed to fetch team members:", error);
+          setMembers([]);
+        } else {
+          setMembers(data || []);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching team members:", err);
+        setMembers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, [user]);
+
+  const filteredMembers = members.filter(
+    (m) =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const totalMembers = members.length;
+  const studentCount = members.filter((m) => m.role === "student").length;
+  const mentorAdminCount = members.filter(
+    (m) => m.role === "mentor" || m.role === "admin"
+  ).length;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -81,10 +91,12 @@ export default function Team() {
               Manage your project collaborators and team
             </p>
           </div>
-          <Button variant="gradient" className="gap-2">
-            <UserPlus className="h-4 w-4" />
-            Invite Member
-          </Button>
+          <Link to="/team/add">
+            <Button variant="gradient" className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Add Member
+            </Button>
+          </Link>
         </div>
 
         {/* Search */}
@@ -95,6 +107,8 @@ export default function Team() {
               <Input
                 placeholder="Search team members..."
                 className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </CardContent>
@@ -109,7 +123,7 @@ export default function Team() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">{teamMembers.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{totalMembers}</p>
                   <p className="text-sm text-muted-foreground">Total Members</p>
                 </div>
               </div>
@@ -122,9 +136,7 @@ export default function Team() {
                   <Users className="h-6 w-6 text-accent" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">
-                    {teamMembers.filter((m) => m.role === "student").length}
-                  </p>
+                  <p className="text-2xl font-bold text-foreground">{studentCount}</p>
                   <p className="text-sm text-muted-foreground">Students</p>
                 </div>
               </div>
@@ -137,9 +149,7 @@ export default function Team() {
                   <Users className="h-6 w-6 text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">
-                    {teamMembers.filter((m) => m.role === "mentor" || m.role === "admin").length}
-                  </p>
+                  <p className="text-2xl font-bold text-foreground">{mentorAdminCount}</p>
                   <p className="text-sm text-muted-foreground">Mentors & Admins</p>
                 </div>
               </div>
@@ -154,47 +164,48 @@ export default function Team() {
             <CardDescription>View and manage all team members</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {teamMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-secondary/30 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
+            {loading ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Loading team members...</p>
+            ) : filteredMembers.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No team members yet.</p>
+                <p className="text-sm text-muted-foreground mt-1">Add your first team member to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-secondary/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={member.avatar} />
+                        <AvatarImage src="" />
                         <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                          {member.name.split(" ").map((n) => n[0]).join("")}
+                          {member.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <span
-                        className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${getStatusColor(member.status)}`}
-                      />
+                      <div>
+                        <p className="font-medium text-foreground">{member.name}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {member.email}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{member.name}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {member.email}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={getRoleBadgeVariant(member.role)} className="capitalize">
+                        {member.role}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden md:block">
-                      <p className="text-sm font-medium text-foreground">{member.projects} projects</p>
-                      <p className="text-xs text-muted-foreground capitalize">{member.status}</p>
-                    </div>
-                    <Badge variant={getRoleBadgeVariant(member.role)} className="capitalize">
-                      {member.role}
-                    </Badge>
-                    <Button variant="outline" size="sm">
-                      View
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

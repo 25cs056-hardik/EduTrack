@@ -42,6 +42,7 @@ interface TasksContextType {
     loading: boolean;
     addTask: (data: AddTaskData) => Promise<Task>;
     updateTask: (id: string, data: UpdateTaskData) => Promise<Task>;
+    updateTaskStatus: (id: string, status: TaskStatus) => Promise<void>;
     refreshTasks: () => Promise<void>;
 }
 
@@ -163,13 +164,33 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         return updated;
     };
 
+    const updateTaskStatus = async (id: string, newStatus: TaskStatus): Promise<void> => {
+        // Optimistic update
+        const previousTasks = [...tasks];
+        setTasks((prev) =>
+            prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
+        );
+
+        const { error } = await (supabase as any)
+            .from("tasks")
+            .update({ status: newStatus })
+            .eq("id", id);
+
+        if (error) {
+            console.error("Supabase status update error:", error);
+            // Revert on failure
+            setTasks(previousTasks);
+            throw new Error(error.message || "Failed to update task status.");
+        }
+    };
+
     const refreshTasks = async () => {
         setLoading(true);
         await fetchTasks();
     };
 
     return (
-        <TasksContext.Provider value={{ tasks, loading, addTask, updateTask, refreshTasks }}>
+        <TasksContext.Provider value={{ tasks, loading, addTask, updateTask, updateTaskStatus, refreshTasks }}>
             {children}
         </TasksContext.Provider>
     );

@@ -19,6 +19,7 @@ import AddTask from "./pages/AddTask";
 import GitHubAnalytics from "./pages/GitHubAnalytics";
 import Feedback from "./pages/Feedback";
 import Team from "./pages/Team";
+import AddMember from "./pages/AddMember";
 import Settings from "./pages/Settings";
 import AccessDenied from "./pages/AccessDenied";
 import NotFound from "./pages/NotFound";
@@ -54,6 +55,11 @@ const App = () => (
                 <Route path="/team" element={
                   <ProtectedRoute>
                     <Team />
+                  </ProtectedRoute>
+                } />
+                <Route path="/team/add" element={
+                  <ProtectedRoute>
+                    <AddMember />
                   </ProtectedRoute>
                 } />
 

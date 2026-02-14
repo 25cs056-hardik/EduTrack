@@ -8,25 +8,180 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DndContext,
+  DragOverlay,
+  DragStartEvent,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  closestCenter,
+} from "@dnd-kit/core";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import type { Task } from "@/contexts/TasksContext";
 
 const columns: { id: TaskStatus; label: string; color: string }[] = [
   { id: "todo", label: "To Do", color: "bg-muted-foreground" },
-  { id: "in_progress", label: "In Progress", color: "bg-info" },
-  { id: "completed", label: "Completed", color: "bg-success" },
+  { id: "in_progress", label: "In Progress", color: "bg-blue-500" },
+  { id: "completed", label: "Completed", color: "bg-green-500" },
 ];
 
+// --- Droppable Column ---
+function DroppableColumn({
+  id,
+  label,
+  color,
+  count,
+  isOver,
+  children,
+}: {
+  id: string;
+  label: string;
+  color: string;
+  count: number;
+  isOver: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-xl p-4 min-h-[500px] transition-colors duration-200",
+        isOver
+          ? "bg-primary/10 ring-2 ring-primary/30"
+          : "bg-secondary/30"
+      )}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className={cn("w-2 h-2 rounded-full", color)} />
+          <h3 className="font-semibold text-foreground">{label}</h3>
+          <Badge variant="secondary" className="ml-1">
+            {count}
+          </Badge>
+        </div>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+// --- Draggable Task ---
+function DraggableTask({
+  task,
+  isDragging,
+}: {
+  task: Task;
+  isDragging: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: task.id,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition: transform ? "none" : "transform 200ms ease",
+    opacity: isDragging ? 0.4 : 1,
+    cursor: "grab",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      <TaskCard
+        title={task.title}
+        description={task.description}
+        priority={task.priority}
+        status={task.status}
+        dueDate={task.dueDate}
+        tags={task.tags}
+      />
+    </div>
+  );
+}
+
 export default function Tasks() {
-  const { tasks, loading } = useTasks();
+  const { tasks, loading, updateTaskStatus } = useTasks();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
 
   const filteredTasks = tasks.filter(
     (task) =>
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.tags?.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      task.tags?.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      )
   );
 
   const getTasksByStatus = (status: TaskStatus) =>
     filteredTasks.filter((task) => task.status === status);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find((t) => t.id === event.active.id);
+    setActiveTask(task || null);
+  };
+
+  const handleDragOver = (event: any) => {
+    const overId = event.over?.id as string | null;
+    if (overId && columns.some((c) => c.id === overId)) {
+      setOverColumnId(overId);
+    } else {
+      setOverColumnId(null);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveTask(null);
+    setOverColumnId(null);
+
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const newStatus = over.id as TaskStatus;
+
+    // Only process if dropped on a valid column
+    if (!columns.some((c) => c.id === newStatus)) return;
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.status === newStatus) return;
+
+    setUpdating(true);
+    try {
+      await updateTaskStatus(taskId, newStatus);
+      toast({
+        title: "Task Updated",
+        description: `Moved to ${columns.find((c) => c.id === newStatus)?.label}`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Update Failed",
+        description: err.message || "Could not update task status.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveTask(null);
+    setOverColumnId(null);
+  };
 
   if (loading) {
     return (
@@ -46,7 +201,7 @@ export default function Tasks() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Task Board</h1>
             <p className="text-muted-foreground mt-1">
-              Organize and track your tasks with Kanban-style board
+              Drag tasks between columns to update their status
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -69,56 +224,62 @@ export default function Tasks() {
         </div>
 
         {/* Kanban Board */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {columns.map((column) => {
-            const columnTasks = getTasksByStatus(column.id);
-            return (
-              <div
-                key={column.id}
-                className="bg-secondary/30 rounded-xl p-4 min-h-[500px]"
-              >
-                {/* Column Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className={cn("w-2 h-2 rounded-full", column.color)} />
-                    <h3 className="font-semibold text-foreground">{column.label}</h3>
-                    <Badge variant="secondary" className="ml-1">
-                      {columnTasks.length}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Tasks */}
-                <div className="space-y-3">
-                  {columnTasks.map((task, index) => (
-                    <div
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {columns.map((column) => {
+              const columnTasks = getTasksByStatus(column.id);
+              return (
+                <DroppableColumn
+                  key={column.id}
+                  id={column.id}
+                  label={column.label}
+                  color={column.color}
+                  count={columnTasks.length}
+                  isOver={overColumnId === column.id}
+                >
+                  {columnTasks.map((task) => (
+                    <DraggableTask
                       key={task.id}
-                      className="animate-fade-in"
-                      style={{ animationDelay: `${index * 0.05}s` }}
-                    >
-                      <TaskCard
-                        title={task.title}
-                        description={task.description}
-                        priority={task.priority}
-                        status={task.status}
-                        dueDate={task.dueDate}
-                        tags={task.tags}
-                      />
-                    </div>
+                      task={task}
+                      isDragging={activeTask?.id === task.id}
+                    />
                   ))}
                   {columnTasks.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-border rounded-xl">
                       <p className="text-sm text-muted-foreground">No tasks</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Drop tasks here or create new
+                        Drag tasks here
                       </p>
                     </div>
                   )}
-                </div>
+                </DroppableColumn>
+              );
+            })}
+          </div>
+
+          {/* Drag Overlay — shows a ghost of the card while dragging */}
+          <DragOverlay>
+            {activeTask ? (
+              <div className="opacity-90 rotate-2 scale-105 shadow-2xl">
+                <TaskCard
+                  title={activeTask.title}
+                  description={activeTask.description}
+                  priority={activeTask.priority}
+                  status={activeTask.status}
+                  dueDate={activeTask.dueDate}
+                  tags={activeTask.tags}
+                />
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </DashboardLayout>
   );
