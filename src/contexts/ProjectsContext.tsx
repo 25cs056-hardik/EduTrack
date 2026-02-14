@@ -58,6 +58,7 @@ interface ProjectsContextType {
     loading: boolean;
     addProject: (data: AddProjectData) => Promise<Project>;
     updateProject: (id: string, data: UpdateProjectData) => Promise<Project>;
+    updateProjectStatus: (id: string, status: Project["status"]) => Promise<void>;
     getProject: (id: string) => Project | undefined;
     refreshProjects: () => Promise<void>;
 }
@@ -189,8 +190,26 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         await fetchProjects();
     };
 
+    const updateProjectStatus = async (id: string, newStatus: Project["status"]): Promise<void> => {
+        const previousProjects = [...projects];
+        setProjects((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
+        );
+
+        const { error } = await (supabase as any)
+            .from("projects")
+            .update({ status: newStatus })
+            .eq("id", id);
+
+        if (error) {
+            console.error("Supabase project status update error:", error);
+            setProjects(previousProjects);
+            throw new Error(error.message || "Failed to update project status.");
+        }
+    };
+
     return (
-        <ProjectsContext.Provider value={{ projects, loading, addProject, updateProject, getProject, refreshProjects }}>
+        <ProjectsContext.Provider value={{ projects, loading, addProject, updateProject, updateProjectStatus, getProject, refreshProjects }}>
             {children}
         </ProjectsContext.Provider>
     );

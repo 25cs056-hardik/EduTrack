@@ -8,15 +8,28 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import type { Project } from "@/contexts/ProjectsContext";
 
 type StatusFilter = "all" | "active" | "completed" | "on_hold";
 
 export default function Projects() {
   const navigate = useNavigate();
-  const { projects } = useProjects();
+  const { projects, updateProjectStatus } = useProjects();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  const handleStatusChange = async (id: string, newStatus: Project["status"]) => {
+    try {
+      await updateProjectStatus(id, newStatus);
+      const labels = { active: "Active", completed: "Completed", on_hold: "On Hold" };
+      toast({ title: "Project Moved", description: `Moved to ${labels[newStatus]}` });
+    } catch (err: any) {
+      toast({ title: "Update Failed", description: err.message || "Could not update status.", variant: "destructive" });
+    }
+  };
 
   const filteredProjects = projects.filter((project) => {
     const matchesSearch = project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -115,6 +128,7 @@ export default function Projects() {
                 <ProjectCard
                   {...project}
                   onClick={() => navigate(`/projects/${project.id}`)}
+                  onStatusChange={handleStatusChange}
                 />
               </div>
             ))}
