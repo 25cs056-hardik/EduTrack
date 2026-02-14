@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ProgressRing } from "@/components/ui/progress-ring";
 import {
     ArrowLeft,
     Calendar,
@@ -98,7 +97,6 @@ export default function ProjectDetails() {
                         </div>
                         <h1 className="text-3xl font-bold text-foreground">{project.title}</h1>
                     </div>
-                    <ProgressRing value={project.progress} size={80} strokeWidth={6} />
                 </div>
 
                 {/* Main grid */}
@@ -136,7 +134,7 @@ export default function ProjectDetails() {
                         )}
 
                         {/* GitHub Repository — Real Data */}
-                        {project.githubUrl && (
+                        {project.githubRepo && (
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
@@ -146,12 +144,12 @@ export default function ProjectDetails() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <a
-                                        href={project.githubUrl}
+                                        href={project.githubRepo}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-2 text-primary hover:underline"
                                     >
-                                        {project.githubUrl}
+                                        {project.githubRepo}
                                         <ExternalLink className="h-3.5 w-3.5" />
                                     </a>
 
@@ -232,8 +230,8 @@ export default function ProjectDetails() {
                                                             <Star
                                                                 key={i}
                                                                 className={`h-3.5 w-3.5 ${i < fb.rating
-                                                                        ? "text-amber-400 fill-amber-400"
-                                                                        : "text-muted-foreground/30"
+                                                                    ? "text-amber-400 fill-amber-400"
+                                                                    : "text-muted-foreground/30"
                                                                     }`}
                                                             />
                                                         ))}
@@ -283,71 +281,11 @@ export default function ProjectDetails() {
                             </CardContent>
                         </Card>
 
-                        {/* Progress Summary */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <BarChart3 className="h-4 w-4" />
-                                    Progress Summary
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <div className="flex justify-between text-sm mb-2">
-                                        <span className="text-muted-foreground">Overall Progress</span>
-                                        <span className="font-medium text-foreground">{project.progress}%</span>
-                                    </div>
-                                    <div className="h-2 rounded-full bg-secondary">
-                                        <div
-                                            className="h-full rounded-full bg-primary transition-all"
-                                            style={{ width: `${project.progress}%` }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                    <CheckCircle2 className="h-4 w-4 text-success" />
-                                    <span className="text-muted-foreground">
-                                        {project.tasksCompleted} of {project.totalTasks} tasks completed
-                                    </span>
-                                </div>
-                            </CardContent>
-                        </Card>
 
-                        {/* Team Members */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Team Members
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {project.members.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {project.members.map((member, i) => (
-                                            <div key={i} className="flex items-center gap-3">
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={member.avatar} />
-                                                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                                        {member.name
-                                                            .split(" ")
-                                                            .map((n) => n[0])
-                                                            .join("")}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-sm text-foreground">{member.name}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No team members yet.</p>
-                                )}
-                            </CardContent>
-                        </Card>
 
                         {/* Edit button for students only */}
                         {userRole === "student" && (
-                            <Button variant="outline" className="w-full">
+                            <Button variant="outline" className="w-full" onClick={() => navigate(`/projects/${project.id}/edit`)}>
                                 Edit Project
                             </Button>
                         )}

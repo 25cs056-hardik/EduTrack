@@ -1,18 +1,12 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ProgressRing } from "@/components/ui/progress-ring";
-import { Calendar, Users, GitBranch } from "lucide-react";
+import { Calendar, GitBranch } from "lucide-react";
 
 interface ProjectCardProps {
   title: string;
   description: string;
-  progress: number;
   status: "active" | "completed" | "on_hold";
   dueDate: string;
-  members: { name: string; avatar?: string }[];
-  tasksCompleted: number;
-  totalTasks: number;
   githubConnected?: boolean;
   className?: string;
   onClick?: () => void;
@@ -27,12 +21,8 @@ const statusConfig = {
 export function ProjectCard({
   title,
   description,
-  progress,
   status,
   dueDate,
-  members,
-  tasksCompleted,
-  totalTasks,
   githubConnected = false,
   className,
   onClick,
@@ -74,11 +64,10 @@ export function ProjectCard({
               {description}
             </p>
           </div>
-          <ProgressRing value={progress} size={64} strokeWidth={5} />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-4 p-3 rounded-lg bg-secondary/50">
+        {/* Due Date */}
+        <div className="p-3 rounded-lg bg-secondary/50">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <div>
@@ -86,37 +75,6 @@ export function ProjectCard({
               <p className="text-sm font-medium text-foreground">{dueDate}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Tasks</p>
-              <p className="text-sm font-medium text-foreground">
-                {tasksCompleted}/{totalTasks}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-border">
-          <div className="flex -space-x-2">
-            {members.slice(0, 4).map((member, i) => (
-              <Avatar key={i} className="h-8 w-8 border-2 border-card">
-                <AvatarImage src={member.avatar} />
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {member.name.split(" ").map((n) => n[0]).join("")}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {members.length > 4 && (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-xs font-medium text-muted-foreground">
-                +{members.length - 4}
-              </div>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {members.length} member{members.length !== 1 ? "s" : ""}
-          </span>
         </div>
       </div>
     </div>

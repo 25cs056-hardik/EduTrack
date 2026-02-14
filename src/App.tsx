@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import AddProject from "./pages/AddProject";
+import EditProject from "./pages/EditProject";
 import ProjectDetails from "./pages/ProjectDetails";
 import Tasks from "./pages/Tasks";
 import GitHubAnalytics from "./pages/GitHubAnalytics";
@@ -79,6 +80,11 @@ const App = () => (
               <Route path="/projects/:id" element={
                 <ProtectedRoute>
                   <ProjectDetails />
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/:id/edit" element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <EditProject />
                 </ProtectedRoute>
               } />
 

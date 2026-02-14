@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useProjects, GitHubData } from "@/contexts/ProjectsContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, GitBranch, Rocket, X } from "lucide-react";
+import { ArrowLeft, GitBranch, Pencil, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 /** Extract owner/repo from a GitHub URL or owner/repo string */
@@ -79,10 +79,13 @@ async function fetchGitHubData(owner: string, repo: string): Promise<GitHubData>
     };
 }
 
-export default function AddProject() {
+export default function EditProject() {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const { addProject } = useProjects();
+    const { getProject, updateProject } = useProjects();
+
+    const project = id ? getProject(id) : undefined;
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -90,9 +93,38 @@ export default function AddProject() {
     const [technologies, setTechnologies] = useState<string[]>([]);
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const [status, setStatus] = useState<"active" | "on_hold">("active");
+    const [status, setStatus] = useState<"active" | "completed" | "on_hold">("active");
     const [githubUrl, setGithubUrl] = useState("");
     const [submitting, setSubmitting] = useState(false);
+
+    // Pre-fill form when project loads
+    useEffect(() => {
+        if (project) {
+            setTitle(project.title);
+            setDescription(project.description);
+            setTechnologies(project.technologies);
+            setStartDate(project.startDate);
+            setEndDate(project.dueDate === "TBD" ? "" : project.dueDate);
+            setStatus(project.status);
+            setGithubUrl(project.githubRepo);
+        }
+    }, [project]);
+
+    if (!project) {
+        return (
+            <DashboardLayout userRole="student">
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                    <h2 className="text-2xl font-bold text-foreground mb-2">Project Not Found</h2>
+                    <p className="text-muted-foreground mb-6">
+                        The project you're trying to edit doesn't exist or has been removed.
+                    </p>
+                    <Button variant="gradient" onClick={() => navigate("/projects")}>
+                        Back to Projects
+                    </Button>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     const addTech = () => {
         const tech = techInput.trim();
@@ -128,27 +160,31 @@ export default function AddProject() {
         setSubmitting(true);
 
         try {
-            // Fetch real GitHub data if URL provided
-            let githubData: GitHubData | null = null;
+            // Determine if GitHub data needs to be re-fetched
+            let githubData: GitHubData | null | undefined = project.githubData;
+            const urlChanged = githubUrl.trim() !== project.githubRepo;
 
-            if (githubUrl.trim()) {
+            if (githubUrl.trim() && urlChanged) {
+                // GitHub URL changed — fetch fresh data
                 const parsed = parseGitHubUrl(githubUrl);
                 if (!parsed) {
-                    toast({ title: "Invalid GitHub URL", description: "Please enter a valid GitHub repository URL (e.g. https://github.com/owner/repo).", variant: "destructive" });
+                    toast({ title: "Invalid GitHub URL", description: "Please enter a valid GitHub repository URL.", variant: "destructive" });
                     setSubmitting(false);
                     return;
                 }
-
                 try {
                     githubData = await fetchGitHubData(parsed.owner, parsed.repo);
-                    toast({ title: "GitHub Connected", description: `Repository "${githubData.fullName}" linked successfully.` });
+                    toast({ title: "GitHub Updated", description: `Repository "${githubData.fullName}" linked successfully.` });
                 } catch (err: any) {
-                    toast({ title: "GitHub Warning", description: `Could not fetch repo data: ${err.message}. Project will be created without GitHub stats.`, variant: "destructive" });
-                    // Continue without GitHub data
+                    toast({ title: "GitHub Warning", description: `Could not fetch repo data: ${err.message}. Keeping existing data.`, variant: "destructive" });
+                    // Keep existing github data
                 }
+            } else if (!githubUrl.trim()) {
+                // GitHub URL removed
+                githubData = null;
             }
 
-            await addProject({
+            await updateProject(project.id, {
                 title: title.trim(),
                 description: description.trim(),
                 technologies,
@@ -160,12 +196,12 @@ export default function AddProject() {
             });
 
             toast({
-                title: "Project Created",
-                description: `"${title}" has been created successfully.`,
+                title: "Project Updated",
+                description: `"${title}" has been updated successfully.`,
             });
-            navigate("/projects");
+            navigate(`/projects/${project.id}`);
         } catch (err: any) {
-            toast({ title: "Error", description: err.message || "Failed to create project.", variant: "destructive" });
+            toast({ title: "Error", description: err.message || "Failed to update project.", variant: "destructive" });
         } finally {
             setSubmitting(false);
         }
@@ -175,20 +211,20 @@ export default function AddProject() {
         <DashboardLayout userRole="student">
             <div className="w-full max-w-4xl mx-auto space-y-6">
                 {/* Back button */}
-                <Button variant="ghost" className="gap-2 -ml-2" onClick={() => navigate("/projects")}>
+                <Button variant="ghost" className="gap-2 -ml-2" onClick={() => navigate(`/projects/${project.id}`)}>
                     <ArrowLeft className="h-4 w-4" />
-                    Back to Projects
+                    Back to Project
                 </Button>
 
                 {/* Form Card */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-2xl">
-                            <Rocket className="h-6 w-6 text-primary" />
-                            Create New Project
+                            <Pencil className="h-6 w-6 text-primary" />
+                            Edit Project
                         </CardTitle>
                         <CardDescription>
-                            Fill in the details below to set up your new project.
+                            Update the details of your project below.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -273,12 +309,13 @@ export default function AddProject() {
                             {/* Status */}
                             <div className="space-y-2">
                                 <Label>Project Status</Label>
-                                <Select value={status} onValueChange={(v) => setStatus(v as "active" | "on_hold")}>
+                                <Select value={status} onValueChange={(v) => setStatus(v as "active" | "completed" | "on_hold")}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="completed">Completed</SelectItem>
                                         <SelectItem value="on_hold">On Hold</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -298,7 +335,9 @@ export default function AddProject() {
                                     />
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Link a GitHub repository to automatically fetch commits, contributors, and activity data.
+                                    {githubUrl.trim() !== project.githubRepo
+                                        ? "GitHub data will be refreshed when you save."
+                                        : "Link a GitHub repository to track commits, contributors, and activity."}
                                 </p>
                             </div>
 
@@ -308,7 +347,7 @@ export default function AddProject() {
                                     type="button"
                                     variant="outline"
                                     className="flex-1"
-                                    onClick={() => navigate("/projects")}
+                                    onClick={() => navigate(`/projects/${project.id}`)}
                                 >
                                     Cancel
                                 </Button>
@@ -318,7 +357,7 @@ export default function AddProject() {
                                     className="flex-1"
                                     disabled={submitting}
                                 >
-                                    {submitting ? "Creating..." : "Create Project"}
+                                    {submitting ? "Updating..." : "Update Project"}
                                 </Button>
                             </div>
                         </form>

@@ -5,6 +5,7 @@ import AdminDashboard from "@/pages/dashboards/AdminDashboard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProjectCard } from "@/components/ui/project-card";
+import { useProjects } from "@/contexts/ProjectsContext";
 import { TaskCard } from "@/components/ui/task-card";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { Button } from "@/components/ui/button";
@@ -63,36 +64,7 @@ const progressData = [
   { name: "Sun", tasks: 2, completed: 2 },
 ];
 
-const projects = [
-  {
-    id: "1",
-    title: "E-Commerce Platform Development",
-    description: "Building a full-stack e-commerce solution with React and Node.js",
-    progress: 75,
-    status: "active" as const,
-    dueDate: "Mar 15, 2024",
-    members: [
-      { name: "Alice Johnson" },
-      { name: "Bob Smith" },
-      { name: "Carol White" },
-    ],
-    tasksCompleted: 18,
-    totalTasks: 24,
-    githubConnected: true,
-  },
-  {
-    id: "2",
-    title: "Machine Learning Research Paper",
-    description: "Research on deep learning applications in healthcare",
-    progress: 45,
-    status: "active" as const,
-    dueDate: "Apr 20, 2024",
-    members: [{ name: "David Lee" }, { name: "Eva Green" }],
-    tasksCompleted: 9,
-    totalTasks: 20,
-    githubConnected: false,
-  },
-];
+
 
 const recentTasks = [
   {
@@ -143,6 +115,7 @@ export default function Dashboard() {
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const { toast } = useToast();
+  const { projects } = useProjects();
 
   // Route to role-specific dashboard
   if (!loading && userRole === "mentor") return <MentorDashboard />;
@@ -324,8 +297,15 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
-            {projects.map((project) => (
-              <ProjectCard key={project.id} {...project} />
+            {projects.slice(0, 4).map((project) => (
+              <ProjectCard
+                key={project.id}   // 👈 ADD THIS
+                title={project.title}
+                description={project.description}
+                status={project.status}
+                dueDate={project.dueDate}
+                githubConnected={project.githubConnected}
+              />
             ))}
           </div>
         </div>
