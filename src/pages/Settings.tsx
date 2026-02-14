@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +15,6 @@ import {
   User,
   Bell,
   Save,
-  Camera,
 } from "lucide-react";
 
 export default function Settings() {
@@ -39,9 +38,7 @@ export default function Settings() {
     }
   }, [profile]);
 
-  const userInitials = profile
-    ? profile.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : "U";
+
 
   const handleSaveProfile = async () => {
     setSaving(true);
@@ -118,31 +115,6 @@ export default function Settings() {
                 <CardDescription>Update your personal details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Avatar */}
-                <div className="flex items-center gap-6">
-                  <div className="relative">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage src="" />
-                      <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
-                        {userInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Profile Photo</p>
-                    <p className="text-sm text-muted-foreground">
-                      JPG, PNG or GIF. Max size 2MB.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Form Fields */}
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">

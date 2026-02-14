@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjects } from "@/contexts/ProjectsContext";
+import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,16 @@ import {
     GitFork,
     AlertCircle,
     Code2,
+    Mail,
 } from "lucide-react";
+
+interface ProjectMember {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    created_at: string;
+}
 
 // Demo mentor feedback
 const demoFeedback = [
@@ -55,6 +66,39 @@ export default function ProjectDetails() {
 
     const project = id ? getProject(id) : undefined;
     const ghData = project?.githubData;
+
+    const [members, setMembers] = useState<ProjectMember[]>([]);
+    const [membersLoading, setMembersLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchMembers = async () => {
+            if (!id) {
+                setMembersLoading(false);
+                return;
+            }
+            try {
+                const { data, error } = await (supabase as any)
+                    .from("team_members")
+                    .select("*")
+                    .eq("project_id", id)
+                    .order("created_at", { ascending: false });
+
+                if (error) {
+                    console.error("Failed to fetch project members:", error);
+                    setMembers([]);
+                } else {
+                    setMembers(data || []);
+                }
+            } catch (err) {
+                console.error("Unexpected error fetching members:", err);
+                setMembers([]);
+            } finally {
+                setMembersLoading(false);
+            }
+        };
+
+        fetchMembers();
+    }, [id]);
 
     if (!project) {
         return (
@@ -281,7 +325,48 @@ export default function ProjectDetails() {
                             </CardContent>
                         </Card>
 
-
+                        {/* Project Members */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Project Members
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {membersLoading ? (
+                                    <p className="text-sm text-muted-foreground text-center py-4">Loading members...</p>
+                                ) : members.length === 0 ? (
+                                    <div className="text-center py-4">
+                                        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                                        <p className="text-sm text-muted-foreground">No members added yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {members.map((member) => (
+                                            <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/30 transition-colors">
+                                                <Avatar className="h-9 w-9">
+                                                    <AvatarImage src="" />
+                                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                                                        {member.name.split(" ").map((n) => n[0]).join("")}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-foreground truncate">{member.name}</p>
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                                                        <Mail className="h-3 w-3 shrink-0" />
+                                                        {member.email}
+                                                    </p>
+                                                </div>
+                                                <Badge variant="outline" className="capitalize text-xs shrink-0">
+                                                    {member.role}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
 
                         {/* Edit button for students only */}
                         {userRole === "student" && (
