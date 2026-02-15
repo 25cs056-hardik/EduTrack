@@ -3,19 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface GitHubData {
-    repoName: string;
-    fullName: string;
+    repo_name: string;
     description: string;
     stars: number;
     forks: number;
-    openIssues: number;
-    defaultBranch: string;
+    open_issues: number;
     language: string;
-    lastUpdated: string;
-    totalCommits: number;
-    totalContributors: number;
-    totalBranches: number;
-    lastCommitDate: string;
+    last_updated: string;
+    total_commits: number;
+    total_contributors: number;
+    total_branches: number;
+    last_commit_time: string;
+    last_commit_message: string;
+    last_commit_author: string;
 }
 
 export interface Project {
@@ -33,7 +33,39 @@ export interface Project {
     github_last_synced?: string | null;
 }
 
-// ... (AddProjectData and UpdateProjectData interfaces remain unchanged)
+export interface AddProjectData {
+    title: string;
+    description: string;
+    technologies: string[];
+    startDate: string;
+    dueDate: string;
+    status: Project["status"];
+    githubRepo: string;
+    githubData?: GitHubData | null;
+}
+
+export interface UpdateProjectData {
+    title: string;
+    description: string;
+    technologies: string[];
+    startDate: string;
+    dueDate: string;
+    status: Project["status"];
+    githubRepo: string;
+    githubData?: GitHubData | null;
+}
+
+export interface ProjectsContextType {
+    projects: Project[];
+    loading: boolean;
+    addProject: (data: AddProjectData) => Promise<Project>;
+    updateProject: (id: string, data: UpdateProjectData) => Promise<Project>;
+    updateProjectStatus: (id: string, status: Project["status"]) => Promise<void>;
+    getProject: (id: string) => Project | undefined;
+    refreshProjects: () => Promise<void>;
+}
+
+const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined);
 
 // Convert a Supabase row to our Project interface
 function rowToProject(row: any): Project {

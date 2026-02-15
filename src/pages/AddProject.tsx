@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, GitBranch, Rocket, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { fetchGithubRepoData } from "@/utils/github";
 
 /** Extract owner/repo from a GitHub URL or owner/repo string */
 function parseGitHubUrl(input: string): { owner: string; repo: string } | null {
@@ -35,49 +36,7 @@ function parseGitHubUrl(input: string): { owner: string; repo: string } | null {
     return null;
 }
 
-/** Fetch real GitHub repo data from the public API */
-async function fetchGitHubData(owner: string, repo: string): Promise<GitHubData> {
-    const headers: Record<string, string> = {
-        Accept: "application/vnd.github.v3+json",
-    };
 
-    const [repoRes, contributorsRes, commitsRes, branchesRes] = await Promise.all([
-        fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=10`, { headers }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=30`, { headers }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`, { headers }),
-    ]);
-
-    if (!repoRes.ok) {
-        const err = await repoRes.json().catch(() => ({}));
-        throw new Error(err.message || `GitHub API error: ${repoRes.status}`);
-    }
-
-    const repoData = await repoRes.json();
-    const contributorsData = contributorsRes.ok ? await contributorsRes.json() : [];
-    const commitsData = commitsRes.ok ? await commitsRes.json() : [];
-    const branchesData = branchesRes.ok ? await branchesRes.json() : [];
-
-    return {
-        repoName: repoData.name || repo,
-        fullName: repoData.full_name || `${owner}/${repo}`,
-        description: repoData.description || "",
-        stars: repoData.stargazers_count || 0,
-        forks: repoData.forks_count || 0,
-        openIssues: repoData.open_issues_count || 0,
-        defaultBranch: repoData.default_branch || "main",
-        language: repoData.language || "",
-        lastUpdated: repoData.updated_at
-            ? new Date(repoData.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "Unknown",
-        totalCommits: Array.isArray(commitsData) ? commitsData.length : 0,
-        totalContributors: Array.isArray(contributorsData) ? contributorsData.length : 0,
-        totalBranches: Array.isArray(branchesData) ? branchesData.length : 0,
-        lastCommitDate: commitsData?.[0]?.commit?.author?.date
-            ? new Date(commitsData[0].commit.author.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "Unknown",
-    };
-}
 
 export default function AddProject() {
     const navigate = useNavigate();
@@ -140,10 +99,15 @@ export default function AddProject() {
                 }
 
                 try {
-                    githubData = await fetchGitHubData(parsed.owner, parsed.repo);
-                    toast({ title: "GitHub Connected", description: `Repository "${githubData.fullName}" linked successfully.` });
+                    const data = await fetchGithubRepoData(githubUrl);
+                    if (data) {
+                        githubData = data;
+                        toast({ title: "GitHub Connected", description: `Repository "${data.repo_name}" linked successfully.` });
+                    } else {
+                        throw new Error("Could not fetch data");
+                    }
                 } catch (err: any) {
-                    toast({ title: "GitHub Warning", description: `Could not fetch repo data: ${err.message}. Project will be created without GitHub stats.`, variant: "destructive" });
+                    toast({ title: "GitHub Warning", description: `Could not fetch repo data. Project will be created without GitHub stats.`, variant: "destructive" });
                     // Continue without GitHub data
                 }
             }

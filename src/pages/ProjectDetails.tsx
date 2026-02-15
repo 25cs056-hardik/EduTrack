@@ -25,8 +25,9 @@ import {
     Code2,
     Mail,
     Lock,
-    Unlock,
+    RefreshCw,
 } from "lucide-react";
+import { fetchGithubRepoData } from "@/utils/github";
 
 interface ProjectMember {
     id: string;
@@ -52,6 +53,8 @@ const statusConfig = {
     on_hold: { label: "On Hold", className: "bg-warning/10 text-warning border-warning/20" },
 };
 
+
+
 export default function ProjectDetails() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -71,6 +74,7 @@ export default function ProjectDetails() {
     const [projectFeedback, setProjectFeedback] = useState<ProjectFeedback[]>([]);
     const [feedbackLoading, setFeedbackLoading] = useState(true);
     const [togglingFeedback, setTogglingFeedback] = useState(false);
+    const [refreshingGithub, setRefreshingGithub] = useState(false);
 
     // Derived project data (context takes precedence, then fetched)
     const project = contextProject || fetchedProject;
@@ -105,7 +109,8 @@ export default function ProjectDetails() {
                     githubRepo: data.github_repo,
                     githubConnected: !!data.github_repo,
                     githubData: data.github_data,
-                    mentor_feedback_enabled: data.mentor_feedback_enabled
+                    mentor_feedback_enabled: data.mentor_feedback_enabled,
+                    github_last_synced: data.github_last_synced
                 };
                 setFetchedProject(mapped);
             } catch (err) {
@@ -215,6 +220,57 @@ export default function ProjectDetails() {
         }
     };
 
+    // Refresh GitHub Data
+    const handleRefreshGithub = async () => {
+        if (!project?.githubRepo || !id) return;
+        setRefreshingGithub(true);
+
+        try {
+            const newData = await fetchGithubRepoData(project.githubRepo);
+
+            if (!newData) {
+                throw new Error("Failed to fetch data from GitHub");
+            }
+
+            const now = new Date().toISOString();
+
+            const { error } = await (supabase as any)
+                .from("projects")
+                .update({
+                    github_data: newData,
+                    github_last_synced: now
+                })
+                .eq("id", id);
+
+            if (error) throw error;
+
+            toast({
+                title: "GitHub Data Updated",
+                description: "Latest stats have been fetched from GitHub.",
+            });
+
+            // Update local state
+            if (contextProject) {
+                await refreshProjects();
+            } else {
+                setFetchedProject(prev => prev ? {
+                    ...prev,
+                    githubData: newData,
+                    github_last_synced: now
+                } : undefined);
+            }
+        } catch (err) {
+            console.error("GitHub refresh error:", err);
+            toast({
+                title: "Update Failed",
+                description: "Could not fetch latest data from GitHub. Check the URL and try again.",
+                variant: "destructive"
+            });
+        } finally {
+            setRefreshingGithub(false);
+        }
+    };
+
     if (loadingProject) {
         return <DashboardLayout><div className="p-8 text-center text-muted-foreground">Loading project details...</div></DashboardLayout>;
     }
@@ -320,10 +376,27 @@ export default function ProjectDetails() {
                         {project.githubRepo && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <GitBranch className="h-5 w-5" />
-                                        GitHub Repository
-                                    </CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2">
+                                            <GitBranch className="h-5 w-5" />
+                                            GitHub Repository
+                                        </CardTitle>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5"
+                                            onClick={handleRefreshGithub}
+                                            disabled={refreshingGithub}
+                                        >
+                                            <RefreshCw className={`h-3.5 w-3.5 ${refreshingGithub ? "animate-spin" : ""}`} />
+                                            {refreshingGithub ? "Syncing..." : "Refresh Data"}
+                                        </Button>
+                                    </div>
+                                    {project.github_last_synced && (
+                                        <CardDescription className="text-xs">
+                                            Last synced: {new Date(project.github_last_synced).toLocaleString()}
+                                        </CardDescription>
+                                    )}
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <a
@@ -341,32 +414,33 @@ export default function ProjectDetails() {
                                             {ghData.description && (
                                                 <p className="text-sm text-muted-foreground">{ghData.description}</p>
                                             )}
+                                            {/* Using safe snake_case keys as requested */}
                                             <div className="grid grid-cols-3 gap-4">
                                                 <div className="p-3 rounded-lg bg-secondary/50 text-center">
-                                                    <p className="text-lg font-bold text-foreground">{ghData.totalCommits}</p>
+                                                    <p className="text-lg font-bold text-foreground">{ghData.total_commits || 0}</p>
                                                     <p className="text-xs text-muted-foreground">Commits</p>
                                                 </div>
                                                 <div className="p-3 rounded-lg bg-secondary/50 text-center">
-                                                    <p className="text-lg font-bold text-foreground">{ghData.totalContributors}</p>
+                                                    <p className="text-lg font-bold text-foreground">{ghData.total_contributors || 0}</p>
                                                     <p className="text-xs text-muted-foreground">Contributors</p>
                                                 </div>
                                                 <div className="p-3 rounded-lg bg-secondary/50 text-center">
-                                                    <p className="text-lg font-bold text-foreground">{ghData.totalBranches}</p>
+                                                    <p className="text-lg font-bold text-foreground">{ghData.total_branches || 0}</p>
                                                     <p className="text-xs text-muted-foreground">Branches</p>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3 pt-2">
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <Star className="h-4 w-4 text-amber-400" />
-                                                    {ghData.stars} stars
+                                                    {ghData.stars || 0} stars
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <GitFork className="h-4 w-4" />
-                                                    {ghData.forks} forks
+                                                    {ghData.forks || 0} forks
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <AlertCircle className="h-4 w-4" />
-                                                    {ghData.openIssues} open issues
+                                                    {ghData.open_issues || 0} open issues
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <Code2 className="h-4 w-4" />
@@ -374,7 +448,7 @@ export default function ProjectDetails() {
                                                 </div>
                                             </div>
                                             <p className="text-xs text-muted-foreground pt-1">
-                                                Last updated: {ghData.lastUpdated} · Last commit: {ghData.lastCommitDate}
+                                                Last updated: {ghData.last_updated} · Last commit: {ghData.last_commit_time ? new Date(ghData.last_commit_time).toLocaleDateString() : "N/A"}
                                             </p>
                                         </>
                                     ) : (
