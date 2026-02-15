@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProjects } from "@/contexts/ProjectsContext";
+import { useProjects, Project } from "@/contexts/ProjectsContext";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
     ArrowLeft,
     Calendar,
@@ -15,14 +18,14 @@ import {
     Users,
     Star,
     Clock,
-    CheckCircle2,
     ExternalLink,
     MessageSquare,
-    BarChart3,
     GitFork,
     AlertCircle,
     Code2,
     Mail,
+    Lock,
+    Unlock,
 } from "lucide-react";
 
 interface ProjectMember {
@@ -53,85 +56,128 @@ export default function ProjectDetails() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { profile } = useAuth();
-    const { getProject } = useProjects();
+    const { getProject, refreshProjects } = useProjects();
+    const { toast } = useToast();
+
+    // Auth & Context
     const userRole = profile?.role || "student";
+    const contextProject = id ? getProject(id) : undefined;
 
-    const project = id ? getProject(id) : undefined;
-    const ghData = project?.githubData;
-
+    // State
+    const [fetchedProject, setFetchedProject] = useState<Project | undefined>(undefined);
+    const [loadingProject, setLoadingProject] = useState(!contextProject);
     const [members, setMembers] = useState<ProjectMember[]>([]);
     const [membersLoading, setMembersLoading] = useState(true);
     const [projectFeedback, setProjectFeedback] = useState<ProjectFeedback[]>([]);
     const [feedbackLoading, setFeedbackLoading] = useState(true);
+    const [togglingFeedback, setTogglingFeedback] = useState(false);
 
+    // Derived project data (context takes precedence, then fetched)
+    const project = contextProject || fetchedProject;
+    const ghData = project?.githubData;
+    const isOwner = project && profile && project.id && profile.id; // approximate check, refine later
+
+    // 1. Fetch Project if not in context (e.g. for mentors)
     useEffect(() => {
-        const fetchMembers = async () => {
-            if (!id) {
-                setMembersLoading(false);
+        const fetchProject = async () => {
+            if (!id || contextProject) {
+                setLoadingProject(false);
                 return;
             }
             try {
                 const { data, error } = await (supabase as any)
-                    .from("team_members")
+                    .from("projects")
                     .select("*")
-                    .eq("project_id", id)
-                    .order("created_at", { ascending: false });
+                    .eq("id", id)
+                    .single();
 
-                if (error) {
-                    console.error("Failed to fetch project members:", error);
-                    setMembers([]);
-                } else {
-                    setMembers(data || []);
-                }
+                if (error) throw error;
+
+                // Map to Project interface manually since we're outside context helper
+                const mapped: Project = {
+                    id: data.id,
+                    title: data.title,
+                    description: data.description,
+                    status: data.status,
+                    startDate: data.start_date,
+                    dueDate: data.end_date,
+                    technologies: data.technologies || [],
+                    githubRepo: data.github_repo,
+                    githubConnected: !!data.github_repo,
+                    githubData: data.github_data,
+                    mentor_feedback_enabled: data.mentor_feedback_enabled
+                };
+                setFetchedProject(mapped);
             } catch (err) {
-                console.error("Unexpected error fetching members:", err);
-                setMembers([]);
+                console.error("Error fetching project:", err);
+            } finally {
+                setLoadingProject(false);
+            }
+        };
+        fetchProject();
+    }, [id, contextProject]);
+
+    // 2. Fetch Members (Merged from project_members + users)
+    useEffect(() => {
+        const fetchMembers = async () => {
+            if (!id) return;
+            try {
+                const { data, error } = await (supabase as any)
+                    .from("project_members")
+                    .select(`
+                        user_id,
+                        role,
+                        joined_at,
+                        user:users ( id, name, email )
+                    `)
+                    .eq("project_id", id);
+
+                if (error) throw error;
+
+                const mappedMembers = (data || []).map((m: any) => ({
+                    id: m.user_id,
+                    name: m.user?.name || "Unknown",
+                    email: m.user?.email || "",
+                    role: m.role || "student",
+                    created_at: m.joined_at
+                }));
+                setMembers(mappedMembers);
+            } catch (err) {
+                console.error("Error fetching members:", err);
             } finally {
                 setMembersLoading(false);
             }
         };
-
         fetchMembers();
     }, [id]);
 
-    // Fetch real feedback for this project
+    // 3. Fetch Feedback
     useEffect(() => {
         const fetchFeedback = async () => {
-            if (!id) {
-                setFeedbackLoading(false);
-                return;
-            }
+            if (!id) return;
             try {
                 const { data, error } = await (supabase as any)
                     .from("feedback")
-                    .select("*")
+                    .select(`*, mentor:users(name)`) // Join to get mentor name directly if possible
                     .eq("project_id", id)
                     .order("created_at", { ascending: false });
 
-                if (error) {
-                    console.error("Failed to fetch project feedback:", error);
-                    setProjectFeedback([]);
-                } else {
-                    const items = data || [];
-                    // Fetch mentor names
-                    const mentorIds = [...new Set(items.map((f: any) => f.mentor_id).filter(Boolean))];
-                    let namesMap: Record<string, string> = {};
-                    if (mentorIds.length > 0) {
-                        const { data: users } = await (supabase as any)
-                            .from("users")
-                            .select("id, name")
-                            .in("id", mentorIds);
-                        if (users) {
-                            users.forEach((u: any) => { namesMap[u.id] = u.name; });
-                        }
-                    }
-                    setProjectFeedback(
-                        items.map((f: any) => ({ ...f, mentor_name: namesMap[f.mentor_id] || "Mentor" }))
-                    );
-                }
+                if (error) throw error;
+
+                // If join didn't work (RLS depends), fallback to manual map or use what we got
+                // The provided query assumes a relationship. If not exists, we use manual map.
+                // Let's assume manual map for safety as 'mentor_id' foreign key exists.
+
+                const items = data || [];
+                // If data has mentor object from join
+                const processed = items.map((f: any) => ({
+                    ...f,
+                    mentor_name: f.mentor?.name || "Mentor"
+                }));
+
+                setProjectFeedback(processed);
             } catch (err) {
-                console.error("Unexpected error fetching feedback:", err);
-                setProjectFeedback([]);
+                console.error("Error fetching feedback:", err);
             } finally {
                 setFeedbackLoading(false);
             }
@@ -139,13 +185,47 @@ export default function ProjectDetails() {
         fetchFeedback();
     }, [id]);
 
+    // Toggle Mentor Feedback (Student only)
+    const handleToggleFeedback = async (enabled: boolean) => {
+        if (!project || !id) return;
+        setTogglingFeedback(true);
+        try {
+            const { error } = await (supabase as any)
+                .from("projects")
+                .update({ mentor_feedback_enabled: enabled })
+                .eq("id", id);
+
+            if (error) throw error;
+
+            toast({
+                title: enabled ? "Feedback Enabled" : "Feedback Disabled",
+                description: `Mentors can ${enabled ? "now" : "no longer"} submit feedback for this project.`,
+            });
+
+            // Update local state
+            if (contextProject) {
+                await refreshProjects(); // Update context
+            } else {
+                setFetchedProject(prev => prev ? { ...prev, mentor_feedback_enabled: enabled } : undefined);
+            }
+        } catch (err: any) {
+            toast({ title: "Error", description: "Failed to update settings.", variant: "destructive" });
+        } finally {
+            setTogglingFeedback(false);
+        }
+    };
+
+    if (loadingProject) {
+        return <DashboardLayout><div className="p-8 text-center text-muted-foreground">Loading project details...</div></DashboardLayout>;
+    }
+
     if (!project) {
         return (
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                     <h2 className="text-2xl font-bold text-foreground mb-2">Project Not Found</h2>
                     <p className="text-muted-foreground mb-6">
-                        The project you're looking for doesn't exist or has been removed.
+                        The project you're looking for doesn't exist or you don't have permission to view it.
                     </p>
                     <Button variant="gradient" onClick={() => navigate("/projects")}>
                         Back to Projects
@@ -156,7 +236,7 @@ export default function ProjectDetails() {
     }
 
     return (
-        <DashboardLayout>
+        <DashboardLayout userRole={userRole as any}>
             <div className="max-w-4xl mx-auto space-y-6">
                 {/* Back button */}
                 <Button variant="ghost" className="gap-2 -ml-2" onClick={() => navigate(-1)}>
@@ -180,11 +260,31 @@ export default function ProjectDetails() {
                         </div>
                         <h1 className="text-3xl font-bold text-foreground">{project.title}</h1>
                     </div>
+
+                    {/* Student Toggle for Feedback */}
+                    {userRole === "student" && (
+                        <div className="flex items-center gap-2 bg-card border border-border p-2 px-3 rounded-lg shadow-sm">
+                            <div className="grid gap-0.5">
+                                <Label htmlFor="feedback-mode" className="text-sm font-medium">
+                                    Mentor Feedback
+                                </Label>
+                                <span className="text-xs text-muted-foreground">
+                                    {project.mentor_feedback_enabled ? "Enabled" : "Disabled"}
+                                </span>
+                            </div>
+                            <Switch
+                                id="feedback-mode"
+                                checked={project.mentor_feedback_enabled}
+                                onCheckedChange={handleToggleFeedback}
+                                disabled={togglingFeedback}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Main grid */}
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Left column — main content */}
+                    {/* Left column */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Description */}
                         <Card>
@@ -192,7 +292,7 @@ export default function ProjectDetails() {
                                 <CardTitle>Description</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-muted-foreground leading-relaxed">
+                                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                                     {project.description || "No description provided."}
                                 </p>
                             </CardContent>
@@ -216,7 +316,7 @@ export default function ProjectDetails() {
                             </Card>
                         )}
 
-                        {/* GitHub Repository — Real Data */}
+                        {/* GitHub Repository */}
                         {project.githubRepo && (
                             <Card>
                                 <CardHeader>
@@ -238,12 +338,9 @@ export default function ProjectDetails() {
 
                                     {ghData ? (
                                         <>
-                                            {/* Repo description */}
                                             {ghData.description && (
                                                 <p className="text-sm text-muted-foreground">{ghData.description}</p>
                                             )}
-
-                                            {/* Key stats */}
                                             <div className="grid grid-cols-3 gap-4">
                                                 <div className="p-3 rounded-lg bg-secondary/50 text-center">
                                                     <p className="text-lg font-bold text-foreground">{ghData.totalCommits}</p>
@@ -258,8 +355,6 @@ export default function ProjectDetails() {
                                                     <p className="text-xs text-muted-foreground">Branches</p>
                                                 </div>
                                             </div>
-
-                                            {/* Extra info */}
                                             <div className="grid grid-cols-2 gap-3 pt-2">
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <Star className="h-4 w-4 text-amber-400" />
@@ -278,21 +373,20 @@ export default function ProjectDetails() {
                                                     {ghData.language || "N/A"}
                                                 </div>
                                             </div>
-
                                             <p className="text-xs text-muted-foreground pt-1">
                                                 Last updated: {ghData.lastUpdated} · Last commit: {ghData.lastCommitDate}
                                             </p>
                                         </>
                                     ) : (
                                         <p className="text-sm text-muted-foreground italic">
-                                            No GitHub analytics data available for this repository.
+                                            No GitHub analytics data available.
                                         </p>
                                     )}
                                 </CardContent>
                             </Card>
                         )}
 
-                        {/* Mentor Feedback */}
+                        {/* Mentor Feedback Section */}
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
@@ -303,16 +397,25 @@ export default function ProjectDetails() {
                                         </CardTitle>
                                         <CardDescription>Feedback received from mentors</CardDescription>
                                     </div>
+
+                                    {/* Action Button for Mentors */}
                                     {(userRole === "mentor" || userRole === "admin") && (
-                                        <Button
-                                            variant="gradient"
-                                            size="sm"
-                                            className="gap-1"
-                                            onClick={() => navigate(`/feedback/new?projectId=${project.id}`)}
-                                        >
-                                            <MessageSquare className="h-4 w-4" />
-                                            Give Feedback
-                                        </Button>
+                                        project.mentor_feedback_enabled ? (
+                                            <Button
+                                                variant="gradient"
+                                                size="sm"
+                                                className="gap-1"
+                                                onClick={() => navigate(`/feedback/new?projectId=${project.id}`)}
+                                            >
+                                                <MessageSquare className="h-4 w-4" />
+                                                Give Feedback
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-muted-foreground text-xs font-medium">
+                                                <Lock className="h-3 w-3" />
+                                                Feedback Disabled by Student
+                                            </div>
+                                        )
                                     )}
                                 </div>
                             </CardHeader>
@@ -352,13 +455,13 @@ export default function ProjectDetails() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-muted-foreground text-sm">No feedback received yet.</p>
+                                    <p className="text-muted-foreground text-sm py-2">No feedback received yet.</p>
                                 )}
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* Right column — sidebar info */}
+                    {/* Right column */}
                     <div className="space-y-6">
                         {/* Timeline */}
                         <Card>
@@ -372,7 +475,7 @@ export default function ProjectDetails() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Start Date</p>
-                                        <p className="text-sm font-medium text-foreground">{project.startDate}</p>
+                                        <p className="text-sm font-medium text-foreground">{project.startDate || "Not set"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -381,7 +484,7 @@ export default function ProjectDetails() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Due Date</p>
-                                        <p className="text-sm font-medium text-foreground">{project.dueDate}</p>
+                                        <p className="text-sm font-medium text-foreground">{project.dueDate || "Not set"}</p>
                                     </div>
                                 </div>
                             </CardContent>

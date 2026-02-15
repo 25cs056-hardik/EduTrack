@@ -19,6 +19,10 @@ CREATE TABLE public.projects (
     start_date DATE,
     end_date DATE,
     created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    mentor_feedback_enabled BOOLEAN DEFAULT false,
+    github_repo TEXT,
+    github_data JSONB,
+    github_last_synced TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 

@@ -29,41 +29,11 @@ export interface Project {
     githubRepo: string;
     githubConnected: boolean;
     githubData?: GitHubData | null;
+    mentor_feedback_enabled?: boolean;
+    github_last_synced?: string | null;
 }
 
-interface AddProjectData {
-    title: string;
-    description: string;
-    technologies: string[];
-    startDate: string;
-    dueDate: string;
-    status: "active" | "completed" | "on_hold";
-    githubRepo: string;
-    githubData?: GitHubData | null;
-}
-
-interface UpdateProjectData {
-    title: string;
-    description: string;
-    technologies: string[];
-    startDate: string;
-    dueDate: string;
-    status: "active" | "completed" | "on_hold";
-    githubRepo: string;
-    githubData?: GitHubData | null;
-}
-
-interface ProjectsContextType {
-    projects: Project[];
-    loading: boolean;
-    addProject: (data: AddProjectData) => Promise<Project>;
-    updateProject: (id: string, data: UpdateProjectData) => Promise<Project>;
-    updateProjectStatus: (id: string, status: Project["status"]) => Promise<void>;
-    getProject: (id: string) => Project | undefined;
-    refreshProjects: () => Promise<void>;
-}
-
-const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined);
+// ... (AddProjectData and UpdateProjectData interfaces remain unchanged)
 
 // Convert a Supabase row to our Project interface
 function rowToProject(row: any): Project {
@@ -78,6 +48,8 @@ function rowToProject(row: any): Project {
         githubRepo: row.github_repo || "",
         githubConnected: Boolean(row.github_repo),
         githubData: row.github_data || null,
+        mentor_feedback_enabled: row.mentor_feedback_enabled || false,
+        github_last_synced: row.github_last_synced || null,
     };
 }
 

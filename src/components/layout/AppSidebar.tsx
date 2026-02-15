@@ -29,6 +29,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: FolderKanban, label: "Projects", href: "/projects", roles: ["student"] },
+  { icon: FolderKanban, label: "Projects", href: "/mentor/projects", roles: ["mentor"] },
   { icon: ListTodo, label: "Tasks", href: "/tasks", roles: ["student"] },
   { icon: GitBranch, label: "GitHub Analytics", href: "/github", roles: ["student"] },
   { icon: MessageSquare, label: "Feedback", href: "/feedback", roles: ["student", "mentor", "admin"] },

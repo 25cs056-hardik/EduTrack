@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
+import MentorProjects from "./pages/MentorProjects";
 import AddProject from "./pages/AddProject";
 import EditProject from "./pages/EditProject";
 import ProjectDetails from "./pages/ProjectDetails";
@@ -69,6 +70,11 @@ const App = () => (
                 <Route path="/projects" element={
                   <ProtectedRoute allowedRoles={["student"]}>
                     <Projects />
+                  </ProtectedRoute>
+                } />
+                <Route path="/mentor/projects" element={
+                  <ProtectedRoute allowedRoles={["mentor"]}>
+                    <MentorProjects />
                   </ProtectedRoute>
                 } />
                 <Route path="/projects/new" element={
