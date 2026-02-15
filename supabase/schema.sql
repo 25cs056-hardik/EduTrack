@@ -26,6 +26,7 @@ CREATE TABLE public.projects (
 CREATE TABLE public.project_members (
     project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    role TEXT CHECK (role IN ('student', 'mentor')) DEFAULT 'student',
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL,
     PRIMARY KEY (project_id, user_id)
 );
@@ -47,8 +48,21 @@ CREATE TABLE public.tasks (
 CREATE TABLE public.feedback (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
+    task_id UUID REFERENCES public.tasks(id) ON DELETE SET NULL,
     mentor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    comment TEXT NOT NULL,
+    student_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    message TEXT NOT NULL,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    status TEXT CHECK (status IN ('pending', 'addressed')) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- FEEDBACK REPLIES TABLE
+CREATE TABLE public.feedback_replies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    feedback_id UUID NOT NULL REFERENCES public.feedback(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
@@ -70,6 +84,7 @@ ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feedback_replies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_repos ENABLE ROW LEVEL SECURITY;
 
 -- POLICIES
@@ -123,14 +138,32 @@ CREATE POLICY "Mentors can manage tasks" ON public.tasks FOR ALL USING (
 );
 
 -- Feedback:
--- Viewable by project members
-CREATE POLICY "Feedback viewable by project members" ON public.feedback FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.project_members WHERE project_id = feedback.project_id AND user_id = auth.uid()) OR
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('mentor', 'admin'))
+CREATE POLICY "Mentors/admins can insert feedback" ON public.feedback FOR INSERT WITH CHECK (
+    auth.uid() = mentor_id
+    AND EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('mentor', 'admin'))
 );
--- Only mentors/admins can create feedback
-CREATE POLICY "Mentors can add feedback" ON public.feedback FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('mentor', 'admin'))
+CREATE POLICY "Students can view their feedback" ON public.feedback FOR SELECT USING (auth.uid() = student_id);
+CREATE POLICY "Mentors can view feedback they sent" ON public.feedback FOR SELECT USING (auth.uid() = mentor_id);
+CREATE POLICY "Admins can view all feedback" ON public.feedback FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Students can update feedback status" ON public.feedback FOR UPDATE
+    USING (auth.uid() = student_id) WITH CHECK (auth.uid() = student_id);
+
+-- Feedback Replies:
+CREATE POLICY "Involved users can insert replies" ON public.feedback_replies FOR INSERT WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (SELECT 1 FROM public.feedback WHERE id = feedback_id AND (student_id = auth.uid() OR mentor_id = auth.uid()))
+);
+CREATE POLICY "Involved users can view replies" ON public.feedback_replies FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.feedback WHERE id = feedback_id AND (student_id = auth.uid() OR mentor_id = auth.uid()))
+);
+CREATE POLICY "Admins can view all replies" ON public.feedback_replies FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Admins can insert replies" ON public.feedback_replies FOR INSERT WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
 );
 
 -- GitHub Repos:
@@ -149,6 +182,7 @@ CREATE POLICY "Mentors can manage repos" ON public.github_repos FOR ALL USING (
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.projects;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.feedback;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.feedback_replies;
 
 -- HELPER FUNCTION FOR USER CREATION (Optional triggering)
 -- This function automatically creates a public.users entry when a new auth user signs up

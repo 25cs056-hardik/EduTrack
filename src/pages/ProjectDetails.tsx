@@ -33,23 +33,15 @@ interface ProjectMember {
     created_at: string;
 }
 
-// Demo mentor feedback
-const demoFeedback = [
-    {
-        id: "f1",
-        mentor: "Dr. Sarah Wilson",
-        content: "Good progress on the authentication module. Consider adding rate limiting for the API endpoints.",
-        date: "Jan 10, 2024",
-        rating: 4,
-    },
-    {
-        id: "f2",
-        mentor: "Dr. Sarah Wilson",
-        content: "The database schema looks solid. Make sure to add proper indexes for query optimization.",
-        date: "Dec 15, 2023",
-        rating: 5,
-    },
-];
+interface ProjectFeedback {
+    id: string;
+    mentor_id: string;
+    message: string;
+    rating: number | null;
+    status: string;
+    created_at: string;
+    mentor_name?: string;
+}
 
 const statusConfig = {
     active: { label: "Active", className: "bg-success/10 text-success border-success/20" },
@@ -69,6 +61,8 @@ export default function ProjectDetails() {
 
     const [members, setMembers] = useState<ProjectMember[]>([]);
     const [membersLoading, setMembersLoading] = useState(true);
+    const [projectFeedback, setProjectFeedback] = useState<ProjectFeedback[]>([]);
+    const [feedbackLoading, setFeedbackLoading] = useState(true);
 
     useEffect(() => {
         const fetchMembers = async () => {
@@ -98,6 +92,51 @@ export default function ProjectDetails() {
         };
 
         fetchMembers();
+    }, [id]);
+
+    // Fetch real feedback for this project
+    useEffect(() => {
+        const fetchFeedback = async () => {
+            if (!id) {
+                setFeedbackLoading(false);
+                return;
+            }
+            try {
+                const { data, error } = await (supabase as any)
+                    .from("feedback")
+                    .select("*")
+                    .eq("project_id", id)
+                    .order("created_at", { ascending: false });
+
+                if (error) {
+                    console.error("Failed to fetch project feedback:", error);
+                    setProjectFeedback([]);
+                } else {
+                    const items = data || [];
+                    // Fetch mentor names
+                    const mentorIds = [...new Set(items.map((f: any) => f.mentor_id).filter(Boolean))];
+                    let namesMap: Record<string, string> = {};
+                    if (mentorIds.length > 0) {
+                        const { data: users } = await (supabase as any)
+                            .from("users")
+                            .select("id, name")
+                            .in("id", mentorIds);
+                        if (users) {
+                            users.forEach((u: any) => { namesMap[u.id] = u.name; });
+                        }
+                    }
+                    setProjectFeedback(
+                        items.map((f: any) => ({ ...f, mentor_name: namesMap[f.mentor_id] || "Mentor" }))
+                    );
+                }
+            } catch (err) {
+                console.error("Unexpected error fetching feedback:", err);
+                setProjectFeedback([]);
+            } finally {
+                setFeedbackLoading(false);
+            }
+        };
+        fetchFeedback();
     }, [id]);
 
     if (!project) {
@@ -256,35 +295,58 @@ export default function ProjectDetails() {
                         {/* Mentor Feedback */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5" />
-                                    Mentor Feedback
-                                </CardTitle>
-                                <CardDescription>Feedback received from your mentor</CardDescription>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <MessageSquare className="h-5 w-5" />
+                                            Mentor Feedback
+                                        </CardTitle>
+                                        <CardDescription>Feedback received from mentors</CardDescription>
+                                    </div>
+                                    {(userRole === "mentor" || userRole === "admin") && (
+                                        <Button
+                                            variant="gradient"
+                                            size="sm"
+                                            className="gap-1"
+                                            onClick={() => navigate(`/feedback/new?projectId=${project.id}`)}
+                                        >
+                                            <MessageSquare className="h-4 w-4" />
+                                            Give Feedback
+                                        </Button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent>
-                                {demoFeedback.length > 0 ? (
+                                {feedbackLoading ? (
+                                    <p className="text-sm text-muted-foreground text-center py-4">Loading feedback...</p>
+                                ) : projectFeedback.length > 0 ? (
                                     <div className="space-y-4">
-                                        {demoFeedback.map((fb) => (
-                                            <div key={fb.id} className="p-4 rounded-lg border border-border">
+                                        {projectFeedback.map((fb) => (
+                                            <div
+                                                key={fb.id}
+                                                className="p-4 rounded-lg border border-border hover:border-primary/30 cursor-pointer transition-all"
+                                                onClick={() => navigate(`/feedback/${fb.id}`)}
+                                            >
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <p className="font-medium text-foreground">{fb.mentor}</p>
-                                                    <div className="flex items-center gap-1">
-                                                        {Array.from({ length: 5 }).map((_, i) => (
-                                                            <Star
-                                                                key={i}
-                                                                className={`h-3.5 w-3.5 ${i < fb.rating
-                                                                    ? "text-amber-400 fill-amber-400"
-                                                                    : "text-muted-foreground/30"
-                                                                    }`}
-                                                            />
-                                                        ))}
-                                                    </div>
+                                                    <p className="font-medium text-foreground">{fb.mentor_name}</p>
+                                                    {fb.rating && (
+                                                        <div className="flex items-center gap-1">
+                                                            {Array.from({ length: 5 }).map((_, i) => (
+                                                                <Star
+                                                                    key={i}
+                                                                    className={`h-3.5 w-3.5 ${i < fb.rating!
+                                                                        ? "text-amber-400 fill-amber-400"
+                                                                        : "text-muted-foreground/30"
+                                                                        }`}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <p className="text-sm text-muted-foreground">{fb.content}</p>
+                                                <p className="text-sm text-muted-foreground line-clamp-2">{fb.message}</p>
                                                 <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                                                     <Clock className="h-3 w-3" />
-                                                    {fb.date}
+                                                    {new Date(fb.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                                 </p>
                                             </div>
                                         ))}

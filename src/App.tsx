@@ -18,6 +18,8 @@ import Tasks from "./pages/Tasks";
 import AddTask from "./pages/AddTask";
 import GitHubAnalytics from "./pages/GitHubAnalytics";
 import Feedback from "./pages/Feedback";
+import GiveFeedback from "./pages/GiveFeedback";
+import FeedbackDetail from "./pages/FeedbackDetail";
 import Team from "./pages/Team";
 import AddMember from "./pages/AddMember";
 import Settings from "./pages/Settings";
@@ -102,10 +104,20 @@ const App = () => (
                   </ProtectedRoute>
                 } />
 
-                {/* Student + Mentor */}
+                {/* Student + Mentor + Admin */}
                 <Route path="/feedback" element={
-                  <ProtectedRoute allowedRoles={["student", "mentor"]}>
+                  <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
                     <Feedback />
+                  </ProtectedRoute>
+                } />
+                <Route path="/feedback/new" element={
+                  <ProtectedRoute allowedRoles={["mentor", "admin"]}>
+                    <GiveFeedback />
+                  </ProtectedRoute>
+                } />
+                <Route path="/feedback/:id" element={
+                  <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
+                    <FeedbackDetail />
                   </ProtectedRoute>
                 } />
 

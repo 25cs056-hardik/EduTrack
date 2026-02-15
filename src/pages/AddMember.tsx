@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft, UserPlus, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AddMember() {
@@ -24,21 +24,20 @@ export default function AddMember() {
     const { user } = useAuth();
     const { projects } = useProjects();
 
-    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
-    const [role, setRole] = useState<"student" | "mentor" | "admin">("student");
+    const [role, setRole] = useState<"student" | "mentor">("mentor");
     const [projectId, setProjectId] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!name.trim()) {
-            toast({ title: "Error", description: "Full name is required.", variant: "destructive" });
-            return;
-        }
         if (!email.trim()) {
             toast({ title: "Error", description: "Email is required.", variant: "destructive" });
+            return;
+        }
+        if (!projectId) {
+            toast({ title: "Error", description: "Please select a project.", variant: "destructive" });
             return;
         }
         if (!user) {
@@ -49,27 +48,84 @@ export default function AddMember() {
         setSubmitting(true);
 
         try {
-            const insertObj: Record<string, any> = {
-                name: name.trim(),
-                email: email.trim().toLowerCase(),
-                role,
-                added_by: user.id,
-            };
-            if (projectId) insertObj.project_id = projectId;
+            // 1. Lookup user by email in the users (profiles) table
+            const { data: foundUser, error: lookupErr } = await (supabase as any)
+                .from("users")
+                .select("id, name, role")
+                .eq("email", email.trim().toLowerCase())
+                .maybeSingle();
 
-            const { error } = await (supabase as any)
-                .from("team_members")
-                .insert(insertObj);
-
-            if (error) {
-                console.error("Supabase team_members insert error:", error);
-                toast({ title: "Error", description: error.message || "Failed to add member.", variant: "destructive" });
+            if (lookupErr) {
+                toast({ title: "Error", description: lookupErr.message, variant: "destructive" });
                 return;
             }
 
+            if (!foundUser) {
+                toast({
+                    title: "User Not Found",
+                    description: "No registered user with that email. They must sign up first.",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            // 2. Validate: if adding as mentor, the user should actually be a mentor
+            if (role === "mentor" && foundUser.role !== "mentor" && foundUser.role !== "admin") {
+                toast({
+                    title: "Role Mismatch",
+                    description: `${foundUser.name} is registered as "${foundUser.role}", not a mentor.`,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            // 3. Check if already a member of this project
+            const { data: existing } = await (supabase as any)
+                .from("project_members")
+                .select("user_id")
+                .eq("project_id", projectId)
+                .eq("user_id", foundUser.id)
+                .maybeSingle();
+
+            if (existing) {
+                toast({
+                    title: "Already a Member",
+                    description: `${foundUser.name} is already assigned to this project.`,
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            // 4. Insert into project_members with role
+            const { error: insertErr } = await (supabase as any)
+                .from("project_members")
+                .insert({
+                    project_id: projectId,
+                    user_id: foundUser.id,
+                    role: role,
+                });
+
+            if (insertErr) {
+                console.error("project_members insert error:", insertErr);
+                toast({ title: "Error", description: insertErr.message || "Failed to add member.", variant: "destructive" });
+                return;
+            }
+
+            // 5. Also insert into team_members for backward compat with student team view
+            await (supabase as any)
+                .from("team_members")
+                .insert({
+                    name: foundUser.name,
+                    email: email.trim().toLowerCase(),
+                    role: role,
+                    project_id: projectId,
+                    added_by: user.id,
+                })
+                .then(() => { /* ignore errors — team_members is supplementary */ });
+
             toast({
                 title: "Member Added",
-                description: `${name} has been added to the team.`,
+                description: `${foundUser.name} has been added as ${role} to the project.`,
             });
             navigate("/team");
         } catch (err: any) {
@@ -80,7 +136,7 @@ export default function AddMember() {
     };
 
     return (
-        <DashboardLayout userRole="student">
+        <DashboardLayout>
             <div className="w-full max-w-xl mx-auto space-y-6">
                 {/* Back button */}
                 <Button variant="ghost" className="gap-2 -ml-2" onClick={() => navigate("/team")}>
@@ -93,70 +149,60 @@ export default function AddMember() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-2xl">
                             <UserPlus className="h-6 w-6 text-primary" />
-                            Add Member
+                            Add Member to Project
                         </CardTitle>
                         <CardDescription>
-                            Add a new member to your team.
+                            Look up a registered user by email and assign them to a project.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form className="space-y-6" onSubmit={handleSubmit}>
-                            {/* Name */}
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Full Name *</Label>
-                                <Input
-                                    id="name"
-                                    placeholder="Enter member's full name"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                />
-                            </div>
-
                             {/* Email */}
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email *</Label>
+                                <Label htmlFor="email">Member's Email *</Label>
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="member@university.edu"
+                                    placeholder="mentor@university.edu"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    The user must already have an account on the platform.
+                                </p>
                             </div>
 
                             {/* Role */}
                             <div className="space-y-2">
-                                <Label>Role</Label>
-                                <Select value={role} onValueChange={(v) => setRole(v as "student" | "mentor" | "admin")}>
+                                <Label>Role in Project</Label>
+                                <Select value={role} onValueChange={(v) => setRole(v as "student" | "mentor")}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="student">Student</SelectItem>
                                         <SelectItem value="mentor">Mentor</SelectItem>
-                                        <SelectItem value="admin">Admin</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             {/* Project selector */}
-                            {projects.length > 0 && (
-                                <div className="space-y-2">
-                                    <Label>Assign to Project (optional)</Label>
-                                    <Select value={projectId} onValueChange={setProjectId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a project" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {projects.map((p) => (
-                                                <SelectItem key={p.id} value={p.id}>
-                                                    {p.title}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
+                            <div className="space-y-2">
+                                <Label>Assign to Project *</Label>
+                                <Select value={projectId} onValueChange={setProjectId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a project" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {projects.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>
+                                                {p.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
                             {/* Buttons */}
                             <div className="flex gap-3 pt-4 border-t border-border">

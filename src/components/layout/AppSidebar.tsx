@@ -31,7 +31,7 @@ const navItems: NavItem[] = [
   { icon: FolderKanban, label: "Projects", href: "/projects", roles: ["student"] },
   { icon: ListTodo, label: "Tasks", href: "/tasks", roles: ["student"] },
   { icon: GitBranch, label: "GitHub Analytics", href: "/github", roles: ["student"] },
-  { icon: MessageSquare, label: "Feedback", href: "/feedback", roles: ["student", "mentor"] },
+  { icon: MessageSquare, label: "Feedback", href: "/feedback", roles: ["student", "mentor", "admin"] },
   { icon: Users, label: "Team", href: "/team" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
