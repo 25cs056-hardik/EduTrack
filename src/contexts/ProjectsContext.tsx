@@ -120,6 +120,30 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         fetchProjects();
+
+        if (!user) return;
+
+        // Set up real-time subscription
+        const channel = supabase
+            .channel(`projects_realtime_${user.id}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "projects",
+                    filter: `created_by=eq.${user.id}`,
+                },
+                () => {
+                    console.log("Real-time project update received");
+                    fetchProjects();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [user]);
 
     const addProject = async (input: AddProjectData): Promise<Project> => {

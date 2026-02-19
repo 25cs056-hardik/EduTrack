@@ -105,6 +105,19 @@ export default function AdminDashboard() {
         };
 
         fetchAll();
+
+        // Set up real-time subscriptions
+        const usersChannel = supabase.channel('admin_users_realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchAll).subscribe();
+        const projectsChannel = supabase.channel('admin_projects_realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchAll).subscribe();
+        const membersChannel = supabase.channel('admin_members_realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'project_members' }, fetchAll).subscribe();
+        const feedbackChannel = supabase.channel('admin_feedback_realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, fetchAll).subscribe();
+
+        return () => {
+            supabase.removeChannel(usersChannel);
+            supabase.removeChannel(projectsChannel);
+            supabase.removeChannel(membersChannel);
+            supabase.removeChannel(feedbackChannel);
+        };
     }, []);
 
     // ── Derived data ───────────────────────────────────

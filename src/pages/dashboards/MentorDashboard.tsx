@@ -143,6 +143,19 @@ export default function MentorDashboard() {
         };
 
         fetchAll();
+
+        if (!user) return;
+
+        // Set up real-time subscriptions
+        const membersChannel = supabase.channel(`mentor_members_${user.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'project_members' }, fetchAll).subscribe();
+        const feedbackChannel = supabase.channel(`mentor_feedback_${user.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'feedback', filter: `mentor_id=eq.${user.id}` }, fetchAll).subscribe();
+        const projectsChannel = supabase.channel(`mentor_projects_${user.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchAll).subscribe();
+
+        return () => {
+            supabase.removeChannel(membersChannel);
+            supabase.removeChannel(feedbackChannel);
+            supabase.removeChannel(projectsChannel);
+        };
     }, [user]);
 
     // ── Derived stats ──────────────────────────────────

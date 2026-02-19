@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface NavItem {
   icon: React.ElementType;
@@ -78,14 +79,17 @@ export function AppSidebar({ userRole = "student" }: AppSidebarProps) {
               <span className="font-semibold text-foreground">EduTrack</span>
             )}
           </Link>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setCollapsed(!collapsed)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {/* Navigation */}

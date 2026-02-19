@@ -27,113 +27,118 @@ import Settings from "./pages/Settings";
 import AccessDenied from "./pages/AccessDenied";
 import NotFound from "./pages/NotFound";
 
+import { ThemeProvider } from "@/contexts/ThemeContext";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ProjectsProvider>
-        <TasksProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/access-denied" element={<AccessDenied />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <ProjectsProvider>
+          <TasksProvider>
+            <TooltipProvider>
 
-                {/* All authenticated roles */}
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-                <Route path="/team" element={
-                  <ProtectedRoute>
-                    <Team />
-                  </ProtectedRoute>
-                } />
-                <Route path="/team/add" element={
-                  <ProtectedRoute>
-                    <AddMember />
-                  </ProtectedRoute>
-                } />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/access-denied" element={<AccessDenied />} />
 
-                {/* Student only */}
-                <Route path="/projects" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <Projects />
-                  </ProtectedRoute>
-                } />
-                <Route path="/mentor/projects" element={
-                  <ProtectedRoute allowedRoles={["mentor"]}>
-                    <MentorProjects />
-                  </ProtectedRoute>
-                } />
-                <Route path="/projects/new" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <AddProject />
-                  </ProtectedRoute>
-                } />
-                <Route path="/tasks" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <Tasks />
-                  </ProtectedRoute>
-                } />
-                <Route path="/tasks/new" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <AddTask />
-                  </ProtectedRoute>
-                } />
-                <Route path="/github" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <GitHubAnalytics />
-                  </ProtectedRoute>
-                } />
+                  {/* All authenticated roles */}
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/team" element={
+                    <ProtectedRoute>
+                      <Team />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/team/add" element={
+                    <ProtectedRoute>
+                      <AddMember />
+                    </ProtectedRoute>
+                  } />
 
-                {/* Project details — all roles can view */}
-                <Route path="/projects/:id" element={
-                  <ProtectedRoute>
-                    <ProjectDetails />
-                  </ProtectedRoute>
-                } />
-                <Route path="/projects/:id/edit" element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <EditProject />
-                  </ProtectedRoute>
-                } />
+                  {/* Student only */}
+                  <Route path="/projects" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <Projects />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mentor/projects" element={
+                    <ProtectedRoute allowedRoles={["mentor"]}>
+                      <MentorProjects />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/projects/new" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <AddProject />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/tasks" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <Tasks />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/tasks/new" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <AddTask />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/github" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <GitHubAnalytics />
+                    </ProtectedRoute>
+                  } />
 
-                {/* Student + Mentor + Admin */}
-                <Route path="/feedback" element={
-                  <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
-                    <Feedback />
-                  </ProtectedRoute>
-                } />
-                <Route path="/feedback/new" element={
-                  <ProtectedRoute allowedRoles={["mentor", "admin"]}>
-                    <GiveFeedback />
-                  </ProtectedRoute>
-                } />
-                <Route path="/feedback/:id" element={
-                  <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
-                    <FeedbackDetail />
-                  </ProtectedRoute>
-                } />
+                  {/* Project details — all roles can view */}
+                  <Route path="/projects/:id" element={
+                    <ProtectedRoute>
+                      <ProjectDetails />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/projects/:id/edit" element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <EditProject />
+                    </ProtectedRoute>
+                  } />
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </TasksProvider>
-      </ProjectsProvider>
-    </AuthProvider>
+                  {/* Student + Mentor + Admin */}
+                  <Route path="/feedback" element={
+                    <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
+                      <Feedback />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/feedback/new" element={
+                    <ProtectedRoute allowedRoles={["mentor", "admin"]}>
+                      <GiveFeedback />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/feedback/:id" element={
+                    <ProtectedRoute allowedRoles={["student", "mentor", "admin"]}>
+                      <FeedbackDetail />
+                    </ProtectedRoute>
+                  } />
+
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </TasksProvider>
+        </ProjectsProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

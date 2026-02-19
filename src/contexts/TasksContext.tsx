@@ -97,6 +97,30 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         fetchTasks();
+
+        if (!user) return;
+
+        // Set up real-time subscription
+        const channel = supabase
+            .channel(`tasks_realtime_${user.id}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "tasks",
+                    filter: `created_by=eq.${user.id}`,
+                },
+                () => {
+                    console.log("Real-time task update received");
+                    fetchTasks();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [user]);
 
     const addTask = async (input: AddTaskData): Promise<Task> => {
